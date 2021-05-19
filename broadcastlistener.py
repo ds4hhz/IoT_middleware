@@ -1,4 +1,37 @@
 import socket
+import threading
+import queue
+
+
+class BroadcastListener(threading.Thread):
+
+    def __init__(self, cfgs, socket):
+        super(BroadcastListener, self).__init__()
+        self.BROADCAST_ADDR = cfgs["brc_addr"]
+        self.BROADCAST_PORT = cfgs["brc_port"]
+        self.configurations = cfgs
+        self.socket = socket
+
+        self.mssg_queue = queue.Queue()
+        self.mutex = threading.Lock()
+
+    def run(self):
+        print("Broadcast listening-thread has started...")
+        try:
+            while True:
+                data, addr = self.socket.recvfrom(1024)
+                if data:
+                    # incoming frame...
+                    self.mssg_queue.put((addr,  data.decode()))
+
+        except Exception as e:
+            print(e)
+
+    def getFromQueue(self):
+        return self.mssg_queue.get(block=True)
+
+
+# ---------- for testing purposes below -------------
 
 if __name__ == '__main__':
     # Listening port
@@ -21,4 +54,4 @@ if __name__ == '__main__':
     while True:
         data, addr = listen_socket.recvfrom(1024)
         if data:
-            print("Received broadcast message from:", data.decode())
+            print("Received broadcast message from:" + str(addr), data.decode())
