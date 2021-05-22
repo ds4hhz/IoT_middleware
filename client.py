@@ -11,6 +11,8 @@ class Client:
             self.TypeOfClient = toc
         except Exception as e:
             print(e)
+        if toc == "CC":
+            self.state= {0,0,0} # off
 
 
     def handle_msg(self):
