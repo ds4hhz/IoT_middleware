@@ -9,10 +9,6 @@ UDP_PORT = 9950
 
 MESSAGE = b"Hello, World!"
 
-print("UDP target IP: %s" % UDP_IP)
-print("UDP target port: %s" % UDP_PORT)
-print("message: %s" % MESSAGE)
-
 # Internet # UDP
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 

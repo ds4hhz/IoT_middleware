@@ -1,6 +1,7 @@
 import socket
 import threading
 import queue
+import pipesfilter
 
 
 class BroadcastListener(threading.Thread):
@@ -19,10 +20,11 @@ class BroadcastListener(threading.Thread):
         print("Broadcast listening-thread has started...")
         try:
             while True:
-                data, addr = self.socket.recvfrom(1024)
+                data, addr = self.socket.recvfrom(1024)  # buffer size is 1024 bytes
                 if data:
                     # incoming frame...
-                    self.mssg_queue.put((addr,  data.decode()))
+                    # self.mssg_queue.put([addr,  data.decode()])
+                    self.mssg_queue.put(pipesfilter.inFilter(data.decode(), addr))
 
         except Exception as e:
             print(e)

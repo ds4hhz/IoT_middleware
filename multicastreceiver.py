@@ -1,10 +1,6 @@
 import threading
 import queue
-"""# Internet  # UDP
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-sock.bind((UDP_IP, UDP_PORT))
-"""
+import pipesfilter
 
 
 class MulticastListener(threading.Thread):
@@ -24,7 +20,10 @@ class MulticastListener(threading.Thread):
         try:
             while True:
                 data, addr = self.socket.recvfrom(1024)  # buffer size is 1024 bytes
-                self.mssg_queue.put((addr,  data.decode()))
+                if data:
+                    # incoming frame...
+                    # self.mssg_queue.put([addr,  data.decode()])
+                    self.mssg_queue.put(pipesfilter.inFilter(data.decode(), addr))
         except Exception as e:
             print(e)
 

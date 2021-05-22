@@ -55,11 +55,13 @@ class Communication(threading.Thread):
             self.binded_bc.sendto(dataframe, (self.configs["brc_addr"], self.configs["brc_port"]))
 
         if typeofmessage == "multicast":
-
-            self.binded_mc.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
 
         if typeofmessage == "udp_unicast":
-            self.binded_mc.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
+            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            sock.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
+
 
         if typeofmessage == "tcp_unicast":
             pass
