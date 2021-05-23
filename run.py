@@ -4,15 +4,11 @@ from configurations import cfg
 from server import Server
 from communicationchannels import Communication
 
-
 # get machine IPv4-Adress & set configurations:
 hostname = socket.gethostname()
 MACHINE_IPV4 = socket.gethostbyname(hostname)
 cfg["machine_ipv4"] = str(MACHINE_IPV4)
 print("Configurations are done... deploying participant...")
-# print('Parent process id:', os.getppid())
-# print('Process id:', os.getpid())
-
 
 
 #   "server" (S)
@@ -27,7 +23,6 @@ if __name__=="__main__":
             print("Commanding Client with IP-Adress " + MACHINE_IPV4 + " is starting ...")
         elif sys.argv[1] == str("S"):
             print("Server with IP-Adress " + MACHINE_IPV4 + " is starting ...")
-
             server = Server()
 
 

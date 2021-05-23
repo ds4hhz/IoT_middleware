@@ -35,7 +35,7 @@ class Election(threading.Thread):
             "ELECTED": [],
             "ELECTIONTIMESTAMP": [],
         }
-        # {"host_ip":"lastheartbeat"}
+        # {"host_ip": time.time()}
         self.heartbeatcatalogue = {
 
         }
@@ -48,21 +48,31 @@ class Election(threading.Thread):
             if (time.time() - self.voteIDs["ELECTIONTIMESTAMP"]) > refresh_intervall:
                 del self.voteIDs["voteID"][i]
                 del self.voteIDs["PID"][i]
-                del self.voteIDs["ELECTED"][i]
                 del self.voteIDs["ELECTIONTIMESTAMP"][i]
-
-
-
 
         self.elected = False
         self.discovery_initiated = False
 
     def run(self):
+        if self.PRIMARY == None:
+            try:
+                election = threading.Thread(target=self.startelection, args=())
+                election.daemon = True
+                election.start()
+            except Exception:
+                print(Exception)
+            finally:
+                election.stop()
+                election.join()
+
         # watch for hearbeats from primary and start election
         while True:
+            # ALSO DYNAMIC DISCOVERY PURPOSE:
+
+            incoming_msg = self.incoming_pipe.get(block=True)
             if self.electionstarted != True:
-                self.updateHeartbeatTime(self.incoming_pipe.get(block=True))
-            time.sleep(1.5)
+                self.updateHeartbeatTime(incoming_msg)
+
             if ((time.time() - self.lastheartbeatfromprimary) > self.electiontimeout-1.5) and (self.PRIMARY != self.MY_IP) and self.electionstarted != True:
                 try:
                     election = threading.Thread(target=self.startelection, args=())
@@ -90,16 +100,18 @@ class Election(threading.Thread):
         self.electionstarttime = time.time()
 
         while self.electionstarted == True:
-            message = self.incoming_pipe.get(block=True)
-            #self.updateHeartbeatTime(self)
-            if self.PRIMARY == None and self.discovery_initiated != True:
-                self.discovery_initiated = True
-                self.electionmessage(message)
+            if self.incoming_pipe.empty() != True:
+                message = self.incoming_pipe.get(block=True)
+            if message[2] == "HB":
+                self.updateHeartbeatTime(self, message[9])
+            electionid = uuid.uuid4()
+            announce_myself_frame = [0, "S", "EL", electionid, None, None, None, self.bully_message, self.MY_IP]
+            self.electionmessage(announce_myself_frame)
 
 
 
 
-            elif message[0] == "EM":
+            if message[0] == "EL":
                 self.handle_election_message(message)
 
             if time.time() - self.electionstarttime > self.electiontimeout:
@@ -108,7 +120,6 @@ class Election(threading.Thread):
     # inquiry
     def electionmessage(self, message):
         electionid = uuid.uuid4()
-
         self.outgoing_pipe.put((message, electionid))
 
 
@@ -117,9 +128,8 @@ class Election(threading.Thread):
     def handle_election_message(self, message):
         try:
             if message[0] not in self.voteIDs["voteID"]:
-                self.voteIDs["voteID"].append(message[0])
-                self.voteIDs["PID"].append(message[1])
-                self.voteIDs["ELECTED"].append(message[2])
+                self.voteIDs["voteID"].append(message[3])
+                self.voteIDs["PID"].append(message[4])
                 self.voteIDs["ELECTIONTIMESTAMP"].append(message[3])
             else:
                 print("Election is already known.")
