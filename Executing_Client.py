@@ -3,7 +3,7 @@ import logging
 import socket
 
 
-class ExecutinClient:
+class ExecutingClient:
     def __init__(self,address,port,buffer_size):
         self.client_address = address
         self.port_address = port
