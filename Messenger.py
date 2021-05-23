@@ -6,7 +6,7 @@ from broadcastlistener import BroadcastListener
 from multicastsender import MulticastSender
 from multicastreceiver import MulticastListener
 
-
+#ToDo vector clock in lampert clock
 class Messenger:
     def __init__(self, process_id: int, num_processes: int, ToS: int, multicast_group: str, multicast_port: int,
                  bcn="192.168.1.255", bcp=10500):
@@ -14,7 +14,7 @@ class Messenger:
         self.ToS = ToS
         self.ToS_list = ["S", "CC", "EC"]
         self.message_type_list = ["msg_ack", "dynamic_discovery", "state_change_request", "state_change_ack",
-                                  "election", "leader_msg", "replication", "replication_ack"]
+                                  "election", "leader_msg", "replication", "replication_ack", "heartbeat"]
 
         self.bcn = bcn
         self.bsp = bcp
