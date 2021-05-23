@@ -10,6 +10,7 @@ import pipesfilter
 
 import time
 import queue
+#toDO: zykliches senden der states an die commanding clients
 
 class Server():
 
