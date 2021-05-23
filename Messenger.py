@@ -7,8 +7,8 @@ from multicastsender import MulticastSender
 from multicastreceiver import MulticastListener
 
 
-class MessageSender:
-    def __init__(self, process_id: int, num_processes: int, ToS: str, multicast_group: str, multicast_port: int,
+class Messenger:
+    def __init__(self, process_id: int, num_processes: int, ToS: int, multicast_group: str, multicast_port: int,
                  bcn="192.168.1.255", bcp=10500):
         self.my_id = process_id
         self.ToS = ToS
@@ -59,11 +59,15 @@ class MessageSender:
     def send_broadcast(self, message):
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
         self.udp_socket.sendto(message, (self.bcn, self.bcp))
+        self.message_id_counter += 1  # increment message_id_counter
+        self.my_vector_clock[self.my_id] += 1  # increment vector clock
 
     def receive_udp_message(self):
         data, addr = self.udp_socket.recvfrom(self.message_max_size)
         self.holdback_queue.append(in_filter(data.decode(), addr))
-        self.compute_priority()  #sort holdback queue
+        self.compute_priority()  # sort holdback queue
 
     def send_multicast(self, message):
         self.udp_socket.sendto(message, self.multicast_group)
+        self.message_id_counter += 1  # increment message_id_counter
+        self.my_vector_clock[self.my_id] += 1  # increment vector clock

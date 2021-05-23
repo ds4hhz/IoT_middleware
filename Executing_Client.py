@@ -1,30 +1,41 @@
 from configurations import cfg
 import logging
 import socket
-from broadcastsender import BroadcastSender
+from Messenger import Messenger
 from pipesfilter import create_frame
+from pipesfilter import Role
+from pipesfilter import MessageType
+from pipesfilter import in_filter
 
 
 class ExecutingClient:
-    def __init__(self, address, port, buffer_size):
+    def __init__(self, address, port, buffer_size, process_id, num_processes):
         self.client_address = address
         self.port_address = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
         self.buffer_size = buffer_size
         self.states_dict = {"off": [0, 0, 0], "on": [0, 1, 0], "blinking": [1, 0, 0]}
         self.state = self.states_dict["off"]
-        self.broadcast_sender_obj = BroadcastSender(tos="EC", bcn="192.168.1.255")
+        self.messenger_obj = Messenger(process_id=process_id, num_processes=num_processes, ToS=Role.EC,
+                                       multicast_group="233.33.33.33", multicast_port=9950,
+                                       bcn="192.168.1.255",
+                                       bcp=10500)
         # toDo: client id
 
     def __bind_socket(self):
         self.socket.bind((self.client_address, self.port_address))
 
     def receive_message(self):
-        pass
+        data, address = self.socket.recvfrom(2048)
+        self.holdback_queue.append(in_filter(data.decode(), address))
+
 
     def send_process_id(self):
-        self.broadcast_sender_obj.broadcast(message=create_frame(0, "EC", "dynamic_discovery", ))
-        pass  # ToDo: send process id / broadcast for dynamic discovery
+        msg = self.messenger_obj.encode_message(priority=1, msg_type=MessageType.dynamic_discovery,
+                                                fairness_assertion=1,
+                                                ec_address=None, statement=None)
+        self.messenger_obj.send_broadcast(message=msg)
+        # ToDo: send process id / broadcast for dynamic discovery
 
     def __state_change(self, state_request):
         if state_request in self.states_dict:

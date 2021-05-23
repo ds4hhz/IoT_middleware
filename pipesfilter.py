@@ -26,7 +26,7 @@ class MessageType(Enum):
 def in_filter(frame, sender_addr):
     unpacked_frame = frame.split(",")
     unpacked_frame[0] = int(unpacked_frame[0])  # PRIORITY
-    unpacked_frame[1] = str(unpacked_frame[1])  # ROLE
+    unpacked_frame[1] = int(unpacked_frame[1])  # ROLE
     unpacked_frame[2] = int(unpacked_frame[2])  # MESSAGE_TYPE
     unpacked_frame[3] = int(unpacked_frame[3])  # MSG_UUID
     unpacked_frame[4] = int(unpacked_frame[4])  # PPID
