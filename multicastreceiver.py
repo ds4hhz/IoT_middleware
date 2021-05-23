@@ -23,7 +23,7 @@ class MulticastListener(threading.Thread):
                 if data:
                     # incoming frame...
                     # self.mssg_queue.put([addr,  data.decode()])
-                    self.mssg_queue.put(pipesfilter.inFilter(data.decode(), addr))
+                    self.mssg_queue.put(pipesfilter.in_filter(data.decode(), addr))
         except Exception as e:
             print(e)
 

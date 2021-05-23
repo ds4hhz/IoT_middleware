@@ -1,5 +1,5 @@
 import socket
-from pipesfilter import create_frame
+from pipesfilter import create_frame, in_filter
 from queue import PriorityQueue
 from broadcastsender import BroadcastSender
 from broadcastlistener import BroadcastListener
@@ -12,6 +12,9 @@ class MessageSender:
                  bcn="192.168.1.255", bcp=10500):
         self.my_id = process_id
         self.ToS = ToS
+        self.ToS_list = ["S", "CC", "EC"]
+        self.message_type_list = ["msg_ack", "dynamic_discovery", "state_change_request", "state_change_ack",
+                                  "election", "leader_msg", "replication", "replication_ack"]
 
         self.bcn = bcn
         self.bsp = bcp
@@ -57,8 +60,10 @@ class MessageSender:
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
         self.udp_socket.sendto(message, (self.bcn, self.bcp))
 
-    def receive_broadcast(self):
-        pass
+    def receive_udp_message(self):
+        data, addr = self.udp_socket.recvfrom(self.message_max_size)
+        self.holdback_queue.append(in_filter(data.decode(), addr))
+        self.compute_priority()  #sort holdback queue
 
     def send_multicast(self, message):
         self.udp_socket.sendto(message, self.multicast_group)
