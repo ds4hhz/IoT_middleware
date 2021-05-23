@@ -38,8 +38,10 @@ class MulticastSender:
         self.queue = PriorityQueue()
         self.my_timestamp = [0] * num_processes
 
-    def __encode_message(self,priority, role, message_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender):
-        return create_frame(priority, role, message_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender).encode('utf-8')
+    def __encode_message(self, priority, role, message_type, msg_uuid, fairness_assertion, sender_clock, ec_address,
+                         statement, sender):
+        return create_frame(priority, role, message_type, msg_uuid, fairness_assertion, sender_clock, ec_address,
+                            statement, sender).encode('utf-8')
 
 
     def send_message(self, message):
