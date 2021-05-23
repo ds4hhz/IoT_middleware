@@ -23,7 +23,7 @@ def outFilter(frame):
     frame[4] = str(frame[4])  # RTT
     frame[5] = str(frame[5])
     frame[6] = str(frame[6])
-    msg_string = " ".join(frame)
+    msg_string = ",".join(frame)
     return [msg_string, RECEIVER]
 
 
