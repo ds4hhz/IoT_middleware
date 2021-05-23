@@ -2,13 +2,14 @@ import socket
 
 
 class Broadcastsender:
-    #typeofsender might be a
+    # typeofsender might be a
     # "server" (S)
     # "controlling client" (CC)
     # "executing client" (EC)
     #  ^
     # "non" not any of above
-    def __init__(self, tos, message="a empty message", bcn="192.168.1.255", bcp=10500):
+    def __init__(self, tos, message="a empty message", bcn="192.168.1.255",
+                 bcp=10500):  # message muss von create_frame kommen um sicherzustellen, dass alle Nachrichten gleich aufgebaut sind
         if tos in ["S", "CC", "EC"]:
             self.ToS = tos
         else:
@@ -18,14 +19,14 @@ class Broadcastsender:
         self.args = {"ToS": self.ToS, "message": message}
 
     def broadcast(self):
-        #leading String (message) design:
+        # leading String (message) design:
         STRING_TO_SEND = str("//" + self.args["ToS"] + "//" + self.args["message"])
 
         # Create a UDP socket
         broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Send message on broadcast address
         broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
-        broadcast_socket.sendto(str.encode(STRING_TO_SEND), (self.BROADCAST_IP,  self.BROADCAST_PORT))
+        broadcast_socket.sendto(str.encode(STRING_TO_SEND), (self.BROADCAST_IP, self.BROADCAST_PORT))
         broadcast_socket.close()
 
 

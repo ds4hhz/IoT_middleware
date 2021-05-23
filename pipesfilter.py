@@ -3,7 +3,7 @@ from struct import *
 # FRAME-Structure
 # POSITIONS:
 #    0   |  1 | 2 |   3    | 4  |         5        |      6     |    7    |   8     |   9  |
-# PRIORITY;ROLE;TYP;MSG-UUID;PPID;FAIRNESS ASSERTION;SENDER-CLOCK;EC-ADDRESS;STATEMENT;SENDER
+# PRIORITY;ROLE;MESSAGE_TYP;MSG-UUID;PPID;FAIRNESS ASSERTION;SENDER-CLOCK;EC-ADDRESS;STATEMENT;SENDER
 
 @staticmethod
 def inFilter(frame, sender_addr):
@@ -27,6 +27,6 @@ def outFilter(frame):
     return [msg_string, RECEIVER]
 
 
-def create_frame(priority, role, sender_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender):
-    message_list = [priority, role, sender_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender]
+def create_frame(priority, role, message_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender):
+    message_list = [priority, role, message_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender]
     return ",".join([str(x) for x in message_list])
