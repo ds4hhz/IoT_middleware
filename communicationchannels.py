@@ -2,7 +2,7 @@ import socket
 from configurations import cfg as defcfg
 import struct
 import threading
-
+import pipesfilter
 
 class Communication(threading.Thread):
 
@@ -60,7 +60,7 @@ class Communication(threading.Thread):
 
         if typeofmessage == "udp_unicast":
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
+            sock.sendto(pipesfilter.outFilter(dataframe), dataframe[9], self.configs["multicast_port"])
 
 
         if typeofmessage == "tcp_unicast":

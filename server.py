@@ -27,6 +27,8 @@ class Server():
 
         # dont send statechange messages if a election is pending (true) => no coordinator probably
         # dont answer to discovery broadcasts
+
+        # w8 for several seconds
         self.pending_election = False
 
         # configurate communication channels
@@ -91,9 +93,10 @@ class Server():
                     # set election to True if election is pending => @ bully algorithm no future hosts shall join the network for safety reasons
                     elif intercepted_broadcast[2] == "DD" and intercepted_broadcast[1] == "S" and self.pending_election != True:
                         # answer to exploratory (CC OR EC)!
-                        self.communicationchannels.send_msg("unicast", "I AM HERE", intercepted_broadcast[9])
+                        # not needed to reach reliable delivery of broadcast/discovery responses, since each server answers the discovery...
+                        self.communicationchannels.send_msg("udp_unicast", "I AM HERE", intercepted_broadcast[9])
 
-
+                    # election outgoing pipe to ordered reliable mc pipe
                     #ormc.mssg_pipe.put(mclistener.getFromQueue())
 
 
