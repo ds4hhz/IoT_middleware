@@ -1,4 +1,5 @@
 import socket
+from pipesfilter import create_frame
 from queue import PriorityQueue
 
 # UDP_IP = "127.0.0.1"
@@ -37,8 +38,9 @@ class MulticastSender:
         self.queue = PriorityQueue()
         self.my_timestamp = [0] * num_processes
 
-    def __create_message(self, message_list: list):
-        return ",".join([str(x) for x in message_list])
+    def __encode_message(self,priority, role, sender_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender):
+        return create_frame(priority, role, sender_type, msd_uuid, fairness_assertion, sender_clock, ec_address, statement, sender).encode('utf-8')
+
 
     def send_message(self, message):
         self.sock.sendto(message, self.multicast_group)

@@ -7,7 +7,7 @@ class ExecutingClient:
     def __init__(self,address,port,buffer_size):
         self.client_address = address
         self.port_address = port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) #tcp client
         self.buffer_size = buffer_size
         self.states_dict = {"off": [0, 0, 0], "on": [0, 1, 0], "blinking": [1, 0, 0]}
         self.state = self.states_dict["off"]
@@ -18,6 +18,9 @@ class ExecutingClient:
 
     def receive_message(self):
         pass
+
+    def send_process_id(self):
+        pass    #ToDo: send process id / broadcast for dynamic discovery
 
     def __state_change(self, state_request):
         if state_request in self.states_dict:
