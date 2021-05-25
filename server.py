@@ -92,7 +92,7 @@ class Server:
 
 #               -----------------------------------------------------------------------------------------------------
 
-                if mclistener.mssg_queue:
+                if not mclistener.mssg_queue.empty():
                     intercepted_mc = mclistener.getFromQueue()
                     print("-- pending interception --")
                     interception_time = time.time()
