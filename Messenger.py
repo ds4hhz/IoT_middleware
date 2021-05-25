@@ -8,7 +8,7 @@ from multicastreceiver import MulticastListener
 
 #ToDo vector clock in lampert clock
 class Messenger:
-    def __init__(self, process_id: int, num_processes: int, ToS: int, multicast_group: str, multicast_port: int,
+    def __init__(self, process_id: int, ToS: int, multicast_group: str, multicast_port: int,
                  bcn="192.168.1.255", bcp=10500):
         self.my_id = process_id
         self.ToS = ToS
@@ -35,7 +35,7 @@ class Messenger:
         self.SEQUENCER_ID = 0
 
         self.queue = PriorityQueue()
-        self.my_vector_clock = [0] * num_processes  # ToDo: index of the vector clock over the PID!!
+        self.my_lamport_clock = [0] # * num_processes
 
         self.broadcast_sender_obj = BroadcastSender()
 
@@ -48,26 +48,27 @@ class Messenger:
     def stringify_vector_clock(self, vector: list):
         return ";".join([str(x) for x in vector])
 
-    def encode_message(self, priority, msg_type, fairness_assertion, ec_address, statement):
-        return create_frame(priority, role=self.ToS, message_type=msg_type, msg_uuid=self.message_id_counter,
+    def encode_message(self, priority,role, msg_type,msg_uuid, ppid, fairness_assertion,sender_clock, payload):
+        return create_frame(priority, role=role, message_type=msg_type, msg_uuid=msg_uuid,
                             fairness_assertion=fairness_assertion,
-                            sender_clock=self.stringify_vector_clock(self.my_vector_clock),
-                            ec_address=ec_address,
-                            statement=statement, sender=self.my_id,
+                            sender_clock=self.stringify_vector_clock(self.my_lamport_clock),
+                            payload=payload, sender=self.my_id,
                             msg_id=self.message_id_counter).encode('utf-8')
 
     def send_broadcast(self, message):
         self.udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
         self.udp_socket.sendto(message, (self.bcn, self.bcp))
         self.message_id_counter += 1  # increment message_id_counter
-        self.my_vector_clock[self.my_id] += 1  # increment vector clock
+        self.my_lamport_clock[self.my_id] += 1  # increment vector clock
 
     def receive_udp_message(self):
         data, addr = self.udp_socket.recvfrom(self.message_max_size)
-        self.holdback_queue.append(in_filter(data.decode(), addr))
-        self.compute_priority()  # sort holdback queue
+        data_frame = in_filter(data.decode(), addr)
+        # self.holdback_queue.append(in_filter(data.decode(), addr))
+        # self.compute_priority()  # sort holdback queue
+        return data_frame
 
     def send_multicast(self, message):
         self.udp_socket.sendto(message, self.multicast_group)
         self.message_id_counter += 1  # increment message_id_counter
-        self.my_vector_clock[self.my_id] += 1  # increment vector clock
+        self.my_lamport_clock[self.my_id] += 1  # increment vector clock

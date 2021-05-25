@@ -11,21 +11,23 @@ class Role(Enum):
 class MessageType(Enum):
     msg_ack = 0
     dynamic_discovery = 1
-    state_change_request = 2
-    state_change_ack = 3
-    election = 4
-    leader_msg = 5
-    replication = 6
-    replication_ack = 7
-    heartbeat = 8
+    dynamic_discovery_ack = 2
+    state_change_request = 3
+    state_change_ack = 4
+    election = 5
+    leader_msg = 6
+    replication = 7
+    replication_ack = 8
+    heartbeat = 9
 
-#todo: Prios für messages bestimmen
+
+# todo: Prios für messages bestimmen
 
 # FRAME-Structure
 # POSITIONS:
 #    0    |  1 | 2         |   3    | 4  |         5        |      6     |    7  |   8  |
 # PRIORITY;ROLE;MESSAGE_TYP;MSG-UUID;PPID;FAIRNESS ASSERTION;SENDER-CLOCK;PAYLOAD;SENDER
-
+#                           ;for ack;
 @staticmethod
 def in_filter(frame, sender_addr):
     unpacked_frame = frame.split(",")
@@ -36,10 +38,11 @@ def in_filter(frame, sender_addr):
     unpacked_frame[4] = int(unpacked_frame[4])  # PPID
     unpacked_frame[5] = int(unpacked_frame[5])  # RTT
     unpacked_frame[6] = int(unpacked_frame[6])  # SENDER-CLOCK
-    unpacked_frame[7] = str(unpacked_frame[7])  # PAYLOAD -> nur gültig bei state_change_request
+    unpacked_frame[7] = str(unpacked_frame[7])  # PAYLOAD
     unpacked_frame[8] = int(unpacked_frame[8])  # MESSAGE_ID
     unpacked_frame.append(sender_addr)
     return unpacked_frame
+
 
 @staticmethod
 def outFilter(frame):
@@ -53,8 +56,6 @@ def outFilter(frame):
     return [msg_string, RECEIVER]
 
 
-def create_frame(priority, role, message_type, msg_uuid, fairness_assertion, sender_clock, ec_address, statement,
-                 sender, msg_id):
-    message_list = [priority, role, message_type, msg_uuid, fairness_assertion, sender_clock, ec_address, statement,
-                    sender, msg_id]
+def create_frame(priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload):
+    message_list = [priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload]
     return ",".join([str(x) for x in message_list])
