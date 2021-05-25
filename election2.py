@@ -4,13 +4,15 @@ import os
 import threading
 import time
 import queue
+import pipesfilter
 
 
 class Election(threading.Thread):
     # DYNAMIC DISCOVERY
     # &
     # BULLY ALGORITHM
-    def __init__(self, main_ppid, my_ip, communicationchannels):
+    def __init__(self, server_uuid, my_ip, communicationchannels):
+        super(Election, self).__init__()
         self.MY_IP = my_ip
         self.cc = communicationchannels
         self.incoming_pipe = queue.Queue()
@@ -21,10 +23,10 @@ class Election(threading.Thread):
         self.bully_message = "I am alive"
 
         self.elected = False
-        self.PRIMARY = None
+        self.PRIMARY = False
 
         self.election_uuid = uuid.uuid4()
-        self.MY_MAIN_PPID = main_ppid
+        self.MY_SERVER_UUID = server_uuid
         self.electionstarttime = None
         self.electiontimeout = 5
 
@@ -32,42 +34,46 @@ class Election(threading.Thread):
             "HOST": [],
             "PPID": [],
             "LAST_ACTIVITY_TIMESTAMP": [],
+            "HIGHER_UUIDS":[]
         }
 
 # --------------------------------------------
 
     def run(self):
         while True:
-            incoming_msg = self.incoming_pipe.get(block=True)
-
-            self._kickhost
-            if incoming_msg[2] == "HB":
-                pass
-            elif incoming_msg[2] == "EL":
-                sender = incoming_msg[9]
-                for index in range(len(self.electionboard["HOST"])):
-                    if self.electionboard["HOST"][index] == sender and self.electionboard["PPID"][index] < self.MY_MAIN_PPID:
-                        self._rejectOccupation(incoming_msg[9])
-                        try:
-                            election = threading.Thread(target=self._rejectOccupation(incoming_msg[9]), args=())
-                            election.daemon = True
-                            election.start()
-                        except Exception:
-                            print(Exception)
-                        finally:
-                            election.stop()
-                            election.join()
-                    else:
-                        self._ackOccupation(incoming_msg[9])
-                        try:
-                            election = threading.Thread(target=self._rejectOccupation(incoming_msg[9]), args=())
-                            election.daemon = True
-                            election.start()
-                        except Exception:
-                            print(Exception)
-                        finally:
-                            election.stop()
-                            election.join()
+            ##self._kickhost()
+            if len(self.electionboard["HOST"]) != 0:
+                self.compareHosts()
+            if self.incoming_pipe:
+                incoming_msg = self.incoming_pipe.get(block=True)
+                if incoming_msg[2] == "HB" and incoming_msg[8] == self.PRIMARY:
+                    self.lastheartbeatfromprimary = time.time()
+                if incoming_msg[2] == "EL":
+                    self.electionstarted = True
+                    sender = incoming_msg[9]
+                    for index in range(len(self.electionboard["HOST"])):
+                        if self.electionboard["HOST"][index] == sender and self.electionboard["PPID"][index] < self.MY_MAIN_PPID:
+                            self._rejectOccupation(incoming_msg[9])
+                            try:
+                                election = threading.Thread(target=self._rejectOccupation(incoming_msg[9]), args=())
+                                election.daemon = True
+                                election.start()
+                            except Exception:
+                                print(Exception)
+                            finally:
+                                election.stop()
+                                election.join()
+                        else:
+                            self._ackOccupation(incoming_msg[9])
+                            try:
+                                election = threading.Thread(target=self._rejectOccupation(incoming_msg[9]), args=())
+                                election.daemon = True
+                                election.start()
+                            except Exception:
+                                print(Exception)
+                            finally:
+                                election.stop()
+                                election.join()
 
     def _rejectOccupation(self):
 
@@ -83,6 +89,12 @@ class Election(threading.Thread):
         # announce myself as coordinator/primary
         self.outgoing_pipe.put(message)
 
+    def compareHosts(self):
+        for uuid in self.electionboard["PPID"]:
+            if self.MY_SERVER_UUID < uuid:
+                self.electionboard["HIGHER_UUIDS"][self.electionboard.index(uuid)] = True
+
+
 # ---------- extra/s below -----------
 
     def _kickhost(self):
@@ -90,17 +102,6 @@ class Election(threading.Thread):
         for i in range(0, len(self.electionboard["LAST_ACTIVITY_TIMESTAMP"])):
             if (time.time() - self.electionboard["LAST_ACTIVITY_TIMESTAMP"]) > refresh_intervall:
                 del self.electionboard["HOST"][i]
-                del self.electionboard["PPID"][i]
-                del self.electionboard["LAST_ACTIVITY_TIMESTAMP"][i]
-
-    def updateHeartbeatTime(self, host):
-
-        if host == self.PRIMARY:
-            self.lastheartbeatfromprimary = time.time()
-        self.heartbeatcatalogue[self.MY_IP] = time.time()
-        self.heartbeatcatalogue[host] = time.time()
-
-        # answer/bully election starter - "I AM ALIVE!" & start another election
 
 
 

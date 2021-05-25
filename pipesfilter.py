@@ -1,4 +1,4 @@
-from struct import *
+
 from enum import Enum
 
 
@@ -33,30 +33,20 @@ def in_filter(frame, sender_addr):
     unpacked_frame[1] = str(unpacked_frame[1])  # ROLE
     unpacked_frame[2] = str(unpacked_frame[2])  # MESSAGE_TYPE
     unpacked_frame[3] = str(unpacked_frame[3])  # MSG_UUID
-    unpacked_frame[4] = int(unpacked_frame[4])  # PPID
+    unpacked_frame[4] = str(unpacked_frame[4])  # PPID
     unpacked_frame[5] = int(unpacked_frame[5])  # FAIRNESS ASSERTION
     unpacked_frame[6] = int(unpacked_frame[6])  # SENDER-CLOCK
     unpacked_frame[7] = str(unpacked_frame[7])  # PAYLOAD -> nur gültig bei state_change_request
-    unpacked_frame.append(sender_addr)
+    unpacked_frame.append(sender_addr[0])
     unpacked_frame[8] = str(unpacked_frame[8])  # SENDER
     return unpacked_frame
 
-@staticmethod
-def outFilter(frame):
-    RECEIVER = frame[9]
-    del frame[-1]
-    frame[0] = str(frame[0])  # PPID
-    frame[4] = str(frame[4])  # RTT
-    frame[5] = str(frame[5])
-    frame[6] = str(frame[6])
-    msg_string = ",".join(frame)
-    return [msg_string, RECEIVER]
-
 
 def create_frame(priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload, sender):
-    message_list = [str(priority), str(role), str(message_type), str(msg_uuid), str(ppid), str(fairness_assertion), str(sender_clock), str(payload), str(sender)]
-    RECEIVER = message_list[8]
+    message_list = [str(priority), str(role), str(message_type), str(msg_uuid), str(ppid), str(fairness_assertion),
+                    str(sender_clock), str(payload), str(sender)]
+    receiver = message_list[8]
     del message_list[-1]
     msg_string = ",".join(message_list)
     print(msg_string)
-    return [msg_string, RECEIVER]
+    return [msg_string, receiver]

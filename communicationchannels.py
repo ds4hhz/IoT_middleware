@@ -35,9 +35,9 @@ class Communication(threading.Thread):
 
     def send_udp_unicast(self, message_frame, receiver):
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+        sock.sendto(str.encode(message_frame), (receiver, self.configs["multicast_port"]))
         # workaround broadcasting...
-        sock.sendto(message_frame, (receiver, self.configs["unicast_port"]))
+
 
     """def binded_tcp_socket(self):
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
