@@ -45,22 +45,30 @@ class ExecutingClient:
         data, address = self.socket.recvfrom(2048)
         self.holdback_queue.append(in_filter(data.decode(), address))
 
+
     def get_server(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        udp_socket.settimeout(3)
         # Set the time-to-live for messages to 1 so they do not go past the
         # local network segment.
         ttl = struct.pack('b', 1)
         udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        print(Role.EC)
         msg = create_frame(priority=2, role=2, message_type=2, msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
-                           payload="I'm alive")
+                           payload="Here I'm!")
+
         udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-        print("send message: ", msg)
         self.my_lamport_clock += 1
-        data, addr = udp_socket.recvfrom(2048)
+        try:
+            data, addr = udp_socket.recvfrom(2048)
+        except socket.timeout:
+            print("time out! No response!")
+            print("try again!")
+            udp_socket.close()
+            self.get_server()
+            return
         print("received data: ", data.decode())
-        data_frame = in_filter(data.decode(), addr)
+        # data_frame = in_filter(data.decode(), addr)
         # while (data_frame[2] != 2):
         #     data, addr = udp_socket.recvfrom(2048)
         #     data_frame = in_filter(data.decode(), addr)
@@ -105,7 +113,6 @@ class ExecutingClient:
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
         connection, addr = self.__bind_socket()
         while (True):
-            # data = self.socket.recvfrom(self.buffer_size)
             data = connection.recvfrom(self.buffer_size)
             if (len(data[0])== 0):
                 print("connection lost!")
