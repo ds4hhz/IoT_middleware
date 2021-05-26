@@ -7,6 +7,7 @@ from pipesfilter import in_filter
 import uuid
 import time
 import sys
+import json
 multicast_group = '224.3.29.71'
 server_address = ('', 10000)
 my_uuid= uuid.uuid4()
@@ -25,19 +26,38 @@ mreq = struct.pack('4sL', group, socket.INADDR_ANY)
 sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 # Receive/respond loop
 i = 0
+ec_dict={}
 while True:
     data, address = sock.recvfrom(2048)
     print(data)
     data= in_filter(data.decode(),address)
-    msg = create_frame(1, 0, 2, data[3],my_uuid,1,my_clock,"runs")
-    if (i%2 == 0):
-        print("sleep 5")
-        time.sleep(5)
-    else:
-        print("sleep 2")
-        time.sleep(1)
-    sock.sendto(msg.encode() ,address)
-    print(msg)
-    print("lamport clock: ",my_clock)
-    my_clock+=1
-    i +=1
+    if(data[1] == "CC" and data[2] == "ec_list_query"):
+        # send dict of all known executing clients with state
+        msg = create_frame(1, "S", "ec_list_query_ack ", data[3], my_uuid, 1, my_clock,json.dumps(ec_dict))
+        sock.sendto(msg.encode(), address)
+        print(msg)
+        print("lamport clock: ", my_clock)
+        my_clock += 1
+        i += 1
+
+    elif (data[1] == "EC" and data[2]=="dynamic_discovery"):
+        # get current state
+        # and uuid
+        temp_dict = json.loads(data[7])
+        for k, v in temp_dict.items():
+            ec_dict[k]=v
+            print(ec_dict)
+        if (i%2 == 0):
+            print("sleep 5")
+            time.sleep(1)
+        else:
+            print("sleep 2")
+            time.sleep(1)
+        msg = create_frame(1, "S", "dynamic_discovery_ack ", data[3], my_uuid, 1, my_clock, "runs")
+        sock.sendto(msg.encode() ,address)
+        print(msg)
+        print("lamport clock: ",my_clock)
+        my_clock+=1
+        i +=1
+
+# ToDo: Multiprocessing zweiten Prozess mit TCP Socket für CC->state_change_request -> S -> EX
