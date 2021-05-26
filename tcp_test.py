@@ -10,7 +10,7 @@ s.connect(('127.0.0.1', 11000))
 
 
 while(True):
-    s.send(create_frame(1,2,3,uuid.uuid4(),my_uuid,1,my_clock,"172.156.0.1; {blinking}").encode())
+    s.send(create_frame(1,2,3,uuid.uuid4(),my_uuid,1,my_clock,"172.156.0.1, {blinking}").encode())
     my_clock +=1
     data = s.recv(1024)
     # s.close()

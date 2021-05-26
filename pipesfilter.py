@@ -1,4 +1,3 @@
-
 from enum import Enum
 
 
@@ -19,6 +18,7 @@ class MessageType(Enum):
     replication = 7
     replication_ack = 8
     heartbeat = 9
+    ec_list_query = 10
 
 
 # todo: Prios für messages bestimmen
@@ -30,7 +30,7 @@ class MessageType(Enum):
 #                           ;for ack;
 # @staticmethod
 def in_filter(frame, sender_addr):
-    unpacked_frame = frame.split(",")
+    unpacked_frame = frame.split(";")
     unpacked_frame[0] = int(unpacked_frame[0])  # PRIORITY
     unpacked_frame[1] = int(unpacked_frame[1])  # ROLE
     unpacked_frame[2] = int(unpacked_frame[2])  # MESSAGE_TYPE
@@ -43,7 +43,6 @@ def in_filter(frame, sender_addr):
     return unpacked_frame
 
 
-
 def create_frame(priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload):
     message_list = [priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload]
-    return ",".join([str(x) for x in message_list])
+    return ";".join([str(x) for x in message_list])

@@ -19,16 +19,12 @@ class ExecutingClient:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
         self.buffer_size = buffer_size
         self.state_list = ["off","on","blinking"]
-        # self.states_dict = {"off": [1, 0, 0], "on": [0, 1, 0], "blinking": [0, 0, 1]}
         self.state = self.state_list[0]
         self.uuid = uuid.uuid4()
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
         self.my_lamport_clock = 0
         self.communication_partner = ""
-        self.message_type_list = ["msg_ack", "dynamic_discovery", "dynamic_discovery_ack", "state_change_request",
-                                  "state_change_ack",
-                                  "election", "leader_msg", "replication", "replication_ack", "heartbeat"]
         # self.messenger_obj = Messenger(process_id=self.uuid, ToS=Role.EC,
         #                                multicast_group="233.33.33.33", multicast_port=9950,
         #                                bcn="192.168.1.255",
@@ -127,5 +123,6 @@ class ExecutingClient:
                 if (data_frame[2] == 3):
                     self.__state_change(state_request=data_frame[7][data_frame[7].index("{")+1:data_frame[7].index("}")])
                     # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
+                    # state wird so erwartet: {blinking}
                     self.__send_ack(connection=connection)
             self.__check_state()
