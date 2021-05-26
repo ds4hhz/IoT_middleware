@@ -107,11 +107,18 @@ class ExecutingClient:
         while (True):
             # data = self.socket.recvfrom(self.buffer_size)
             data = connection.recvfrom(self.buffer_size)
-            print(data)
-            data_frame = in_filter(data[0].decode(), addr)
-            print("data frame: ", data_frame)
-            if (data_frame[2] == 3):
-                self.__state_change(state_request=data_frame[7][data_frame[7].index("{")+1:data_frame[7].index("}")])
-                # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
-                self.__send_ack(connection=connection)
+            if (len(data[0])== 0):
+                print("connection lost!")
+                connection.close()
+                self.get_server()
+                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
+                connection, addr = self.__bind_socket()
+            else:
+                print(data)
+                data_frame = in_filter(data[0].decode(), addr)
+                print("data frame: ", data_frame)
+                if (data_frame[2] == 3):
+                    self.__state_change(state_request=data_frame[7][data_frame[7].index("{")+1:data_frame[7].index("}")])
+                    # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
+                    self.__send_ack(connection=connection)
             self.__check_state()
