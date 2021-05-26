@@ -1,4 +1,4 @@
-from struct import *
+
 from enum import Enum
 
 
@@ -43,17 +43,6 @@ def in_filter(frame, sender_addr):
     unpacked_frame.append(sender_addr)
     return unpacked_frame
 
-
-@staticmethod
-def outFilter(frame):
-    RECEIVER = frame[9]
-    del frame[-1]
-    frame[0] = str(frame[0])  # PPID
-    frame[4] = str(frame[4])  # RTT
-    frame[5] = str(frame[5])
-    frame[6] = str(frame[6])
-    msg_string = ",".join(frame)
-    return [msg_string, RECEIVER]
 
 
 def create_frame(priority, role, message_type, msg_uuid, ppid, fairness_assertion, sender_clock, payload):

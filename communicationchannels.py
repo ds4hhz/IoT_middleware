@@ -1,4 +1,6 @@
 import socket
+
+import configurations
 from configurations import cfg as defcfg
 import struct
 import threading
@@ -14,18 +16,36 @@ class Communication(threading.Thread):
 
         self.binded_bc = self.bind_broadcastlistener()
         self.binded_mc = self.bind_multicastlistener()
+        #self.binded_tcp_sock = self.binded_tcp_socket()
         #self.binded_udp_unicast = self.get_unicast_socket()
         #self.binded_tcp = self.get_tcp_socket()
 
-    def get_unicast_socket(self):
-        socket_ucast = socket(socket.AF_INET, socket.SOCK_DGRAM)
-        socket_ucast.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return socket_ucast
+    def send_bc_socket(self, message_frame):
+        # Create a UDP socket
+        broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Send message on broadcast address
+        broadcast_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, True)
+        broadcast_socket.sendto(str.encode(message_frame), (self.configs["brc_addr"], self.configs["brc_port"]))
+        broadcast_socket.close()
+
+    def send_mc_socket(self, message_frame):
+        broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        broadcast_socket.sendto(message_frame, (self.configs["multicast_group"], self.configs["multicast_port"]))
+        broadcast_socket.close()
+
+    def send_udp_unicast(self, message_frame, receiver):
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.sendto(str.encode(message_frame), (receiver, self.configs["multicast_port"]))
+        # workaround broadcasting...
+
+
+    """def binded_tcp_socket(self):
+        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_socket.bind((self.configs["machine_ipv4"]),1024)
+        return tcp_socket"""
 
     def get_tcp_socket(self):
-        tcp_socket = socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        return tcp_socket
+        return self.binded_tcp_sock
 
     def bind_multicastlistener(self):
         mc_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
@@ -65,5 +85,6 @@ class Communication(threading.Thread):
 
         if typeofmessage == "tcp_unicast":
             pass
+
 
 

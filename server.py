@@ -1,18 +1,23 @@
-import socket, os
+import os
 import threading
+import uuid
+
 from configurations import cfg as configurations
 from broadcastlistener import BroadcastListener
 from multicastreceiver import MulticastListener
 from orderedreliablemc import OrderedReliableMulticast
 from communicationchannels import Communication
-from election import Election
+from election2 import Election
 import pipesfilter
+from dynamicdiscovery import DynamicDiscovery
 
 import time
 import queue
-#toDO: zykliches senden der states an die commanding clients
 
-class Server():
+
+# toDO: zykliches senden der states an die commanding clients
+
+class Server:
 
     def __init__(self):
 
@@ -21,10 +26,7 @@ class Server():
         self.cfg = configurations
         self.lead = False
         self.running = True
-        self.hosts = []
-        self.hosts.append(self.ip)
-
-        self.discovery_thread = []
+        self.my_ppid = os.getppid()
 
         # dont send statechange messages if a election is pending (true) => no coordinator probably
         # dont answer to discovery broadcasts
@@ -35,10 +37,9 @@ class Server():
         # configurate communication channels
         self.communicationchannels = Communication(configurations)
 
-
         ormc = OrderedReliableMulticast()
-        election = Election(os.getppid(), self.cfg["machine_ipv4"], self.communicationchannels)
 
+        self.server_uuid = uuid.uuid4()
 
         # initialize sockets...
         brclistener = BroadcastListener(configurations, self.communicationchannels.get_broadcastlistener())
@@ -46,69 +47,78 @@ class Server():
         mclistener = MulticastListener(configurations, self.communicationchannels.get_multicastlistener())
         mclistener.daemon = True
 
+        self.discovery = DynamicDiscovery(self.server_uuid, self.my_ppid, self.communicationchannels)
+        self.discovery.daemon = True
+        election = Election(self.server_uuid, self.ip, self.communicationchannels)
+        election.daemon = True
+
+        brclistener.start()
+        mclistener.start()
+        self.discovery.start()
+        election.start()
         try:
-            brclistener.start()
-            mclistener.start()
-
-
-            # brclistener.election = True
             while self.running is True:
+                time.sleep(2)
+                print("my server uuid " + str(self.server_uuid))
+                print(election.electionboard)
+                #self.pending_election = election.electionstarted
 
-
-                if brclistener.mssg_queue.empty() != True:
+                if not brclistener.mssg_queue.empty():
                     intercepted_broadcast = brclistener.getFromQueue()
-                    print("-- pending discovery --")
-                    interception_time = time.time()
+                    print(intercepted_broadcast)
                     # answer to CC or EC
-                    if intercepted_broadcast[2] == "DD" and intercepted_broadcast[1] != "S":
-                        # answer to exploratory (CC OR EC)!
-                        pass
-                    # set election to True if election is pending => @ bully algorithm no future hosts shall join the network for safety reasons
-                    elif intercepted_broadcast[2] == "DD" and intercepted_broadcast[1] == "S" and self.pending_election != True:
-                        # answer to exploratory (CC OR EC)!
-                        pass
+                    if intercepted_broadcast[2] == "DD" \
+                            and intercepted_broadcast[1] != "S":
+                        self.discovery.answerToClients(intercepted_broadcast)
 
+                    # set election to True if election is pending
+                    # => @ bully algorithm no future hosts shall join the network for safety reasons
+                    if intercepted_broadcast[2] == "DD" \
+                            and intercepted_broadcast[1] == "S" \
+                            and self.pending_election is not True \
+                            and intercepted_broadcast[4] not in election.electionboard["PPID"]:
+                        self.discovery.answerToHosts(intercepted_broadcast)
 
-                    # ormc.mssg_pipe.put(brclistener.getFromQueue())
+                    if intercepted_broadcast[1] == "S" \
+                            and intercepted_broadcast[8] != self.ip \
+                            and intercepted_broadcast[8] not in election.electionboard["HOST"]\
+                            and self.pending_election is not True:
+                        election.electionboard["HOST"].append(intercepted_broadcast[8])
+                        election.electionboard["PPID"].append(
+                            intercepted_broadcast[3])  # append uuid instead ppid => more unique
+                        election.electionboard["LAST_ACTIVITY_TIMESTAMP"].append(time.time())
+                        election.electionboard["SIGNED"].append(False)
+                        self.discovery.setHostCount(len(election.electionboard["HOST"]))
 
-                elif mclistener.mssg_queue.empty() != True:
-                    intercepted_broadcast = mclistener.getFromQueue()
+#               -----------------------------------------------------------------------------------------------------
+
+                if not mclistener.mssg_queue.empty():
+                    intercepted_mc = mclistener.getFromQueue()
                     print("-- pending interception --")
                     interception_time = time.time()
-                    if intercepted_broadcast[3] in ormc.acked_mssgs:
-                        # do nothing if already acknowledged
-                        pass
-                    elif intercepted_broadcast[3] in ormc.non_acked_mssgs:
-                        # acknowledge message as received
-                        ormc.non_acked_mssgs[intercepted_broadcast[3]][0] = True
-                        election.incoming_pipe.put(intercepted_broadcast, interception_time)
+                    if intercepted_mc[2] == "HB" or intercepted_mc[2] == "EL":
+                        election.incoming_pipe.put(intercepted_mc, interception_time)
+                        if intercepted_mc[8] in election.electionboard["HOST"]:
+                            election.electionboard["LAST_ACTIVITY_TIMESTAMP"][election.electionboard["HOST"].index(intercepted_mc[8])] = time.time()
 
-                        # fairness = time.time() - ormc.non_acked_mssgs[intercepted_broadcast[3]][1]
-                    elif intercepted_broadcast[2] == "HB" or intercepted_broadcast[2] == "EL ":
-                        election.incoming_pipe.put(intercepted_broadcast, interception_time)
-                    # answer to CC or EC
-                    elif intercepted_broadcast[2] == "DD" and intercepted_broadcast[1] != "S":
-                        # answer to exploratory (CC OR EC)!
-                        self.communicationchannels.send_msg("udp_unicast", "I AM HERE", intercepted_broadcast[9])
 
-                    # set election to True if election is pending => @ bully algorithm no future hosts shall join the network for safety reasons
-                    elif intercepted_broadcast[2] == "DD" and intercepted_broadcast[1] == "S" and self.pending_election != True:
-                        # answer to exploratory (CC OR EC)!
-                        # not needed to reach reliable delivery of broadcast/discovery responses, since each server answers the discovery...
-                        self.communicationchannels.send_msg("udp_unicast", "I AM HERE", intercepted_broadcast[9])
-
-                    # election outgoing pipe to ordered reliable mc pipe
-                    #ormc.mssg_pipe.put(mclistener.getFromQueue())
 
 
         except Exception as e:
             print(e)
 
         finally:
-            brclistener.stop()
-            mclistener.stop()
             brclistener.join()
             mclistener.join()
+            self.discovery.join()
+            election.join()
+
+            brclistener.stop()
+            mclistener.stop()
+            self.discovery.stop()
+            election.join()
+        # hearbeat_thread.join()
+        # hearbeat_thread.stop()
 
     def mirror_msg(self):
         pass

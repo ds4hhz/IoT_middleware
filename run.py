@@ -1,5 +1,4 @@
 import sys, socket
-import os
 from configurations import cfg
 from server import Server
 from communicationchannels import Communication
@@ -23,9 +22,12 @@ if __name__=="__main__":
             print("Commanding Client with IP-Adress " + MACHINE_IPV4 + " is starting ...")
         elif sys.argv[1] == str("S"):
             print("Server with IP-Adress " + MACHINE_IPV4 + " is starting ...")
-            server = Server()
-
-
+            try:
+                server = Server()
+            except Exception as e:
+                print(e)
+            #finally:
+            #    server.join()
 
         else:
             print("Wrong type of partipicant is defined... Choose EC, CC or S")
