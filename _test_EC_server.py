@@ -15,9 +15,11 @@ server_address = ('', 10000)
 my_uuid= uuid.uuid4()
 my_clock = 0
 
+
+
 def tcp_socket():
     tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
-    tcp_socket.bind(("127.0.0.1", 12000))
+    tcp_socket.bind(("10.0.2.15", 12000))
     tcp_socket.listen(1)
     conn, addr = tcp_socket.accept()
     data = conn.recvfrom(2048)
@@ -26,7 +28,7 @@ def tcp_socket():
         conn.close()
     print(data)
 
-def udp_sockert():
+def udp_socket():
     multicast_group = '224.3.29.71'
     server_address = ('', 10000)
     my_uuid = uuid.uuid4()
@@ -79,3 +81,6 @@ def udp_sockert():
             i +=1
 
 # ToDo: Multiprocessing zweiten Prozess mit TCP Socket für CC->state_change_request -> S -> EX
+
+tcp_process = multiprocessing.Process(target=tcp_socket,name="tcp_process")
+udp_process = multiprocessing.Process(target=udp_socket(),name="udp_process")

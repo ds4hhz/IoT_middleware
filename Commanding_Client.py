@@ -80,7 +80,8 @@ class CommandingClient:
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((self.communication_partner, 12000))
+        tcp_socket.connect((self.communication_partner[0], 12000))
+        # tcp_socket.connect(("127.0.0.1", 12000))
         tcp_socket.send(msg.encode())
 
 
@@ -100,6 +101,7 @@ class CommandingClient:
         executing_client_uuid = str(input())
         print("please enter the state you want, possible states are \"off, on , blinking\" ")
         executing_client_state = str(input())
+        self.__send_state_change_request(executing_client_uuid,executing_client_state)
         # connection, addr = self.__bind_socket()
         # while (True):
         #     data = connection.recvfrom(self.buffer_size)
