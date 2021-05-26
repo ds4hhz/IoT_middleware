@@ -79,8 +79,10 @@ class CommandingClient:
         msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
-        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_socket.settimeout(3)
+        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        tcp_socket.connect((self.communication_partner, 12000))
+        tcp_socket.send(msg.encode())
+
 
     def __send_ack(self, connection):
         msg = create_frame(priority=2, role="EC", message_type=MessageType.state_change_ack, msg_uuid=uuid.uuid4(),
