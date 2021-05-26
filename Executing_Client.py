@@ -7,11 +7,13 @@ from pipesfilter import Role
 from pipesfilter import MessageType
 from pipesfilter import in_filter
 import uuid
+import struct
+import sys
 
 
 class ExecutingClient:
-    def __init__(self, address='127.0.0.1', port=11000, buffer_size=2048, multicast_group="192.168.1.255",
-                 multicast_port=10500):
+    def __init__(self, address='127.0.0.1', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
+                 multicast_port=10000):
         self.client_address = address
         self.port_address = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
@@ -26,10 +28,10 @@ class ExecutingClient:
         self.message_type_list = ["msg_ack", "dynamic_discovery", "dynamic_discovery_ack", "state_change_request",
                                   "state_change_ack",
                                   "election", "leader_msg", "replication", "replication_ack", "heartbeat"]
-        self.messenger_obj = Messenger(process_id=self.uuid, ToS=Role.EC,
-                                       multicast_group="233.33.33.33", multicast_port=9950,
-                                       bcn="192.168.1.255",
-                                       bcp=10500)
+        # self.messenger_obj = Messenger(process_id=self.uuid, ToS=Role.EC,
+        #                                multicast_group="233.33.33.33", multicast_port=9950,
+        #                                bcn="192.168.1.255",
+        #                                bcp=10500)
         # toDo: client id
 
     def __bind_socket(self):
@@ -41,14 +43,19 @@ class ExecutingClient:
 
     def get_server(self):
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Set the time-to-live for messages to 1 so they do not go past the
+        # local network segment.
+        ttl = struct.pack('b', 1)
+        udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
         msg = create_frame(priority=2, role="EC", message_type=MessageType.dynamic_discovery, msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,payload="I'm alive")
-        udp_socket.sendto(msg, self.multicast_group)
+        udp_socket.sendto(msg.encode(), (self.multicast_group,self.multicast_port))
+        print("send message: ",msg)
         self.my_lamport_clock += 1
-        data, addr = udp_socket.recvfrom(self.message_max_size)
+        data, addr = udp_socket.recvfrom(2048)
         data_frame = in_filter(data.decode(), addr)
         while (data_frame[2] != MessageType.dynamic_discovery_ack):
-            data, addr = udp_socket.recvfrom(self.message_max_size)
+            data, addr = udp_socket.recvfrom(2048)
             data_frame = in_filter(data.decode(), addr)
         self.communication_partner = addr
 

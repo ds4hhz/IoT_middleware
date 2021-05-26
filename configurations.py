@@ -11,7 +11,8 @@ cfg = {
     "multicast_port": 9950,
     "multicast_retrys": 3,
 
-    "brc_addr": "192.168.1.255",
+    # "brc_addr": "192.168.1.255",
+    "brc_addr": "192.168.56.255",
     "brc_port": 10500,
 
     "unicast_port": 10001,
