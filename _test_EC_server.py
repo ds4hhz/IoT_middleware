@@ -1,9 +1,15 @@
 import struct
 import socket
+from pipesfilter import create_frame
+from pipesfilter import Role
+from pipesfilter import MessageType
+from pipesfilter import in_filter
+import uuid
 import sys
 multicast_group = '224.3.29.71'
-server_address = ('127.0.0.1', 10000)
-
+server_address = ('', 10000)
+my_uuid= uuid.uuid4()
+my_clock = 0
 
 # Create the socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -17,9 +23,15 @@ group = socket.inet_aton(multicast_group)
 mreq = struct.pack('4sL', group, socket.INADDR_ANY)
 sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 # Receive/respond loop
+
 while True:
     data, address = sock.recvfrom(2048)
-    print(data.encode())
+    print(data)
+    data= in_filter(data.decode(),address)
+    msg = create_frame(1, 0, 2, data[3],my_uuid,1,my_clock,"runs")
 
 
-    sock.sendto('ack', address)
+    sock.sendto(msg.encode() ,address)
+    print(msg)
+    print("lamport clock: ",my_clock)
+    my_clock+=1

@@ -18,8 +18,9 @@ class ExecutingClient:
         self.port_address = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
         self.buffer_size = buffer_size
-        self.states_dict = {"off": [0, 0, 0], "on": [0, 1, 0], "blinking": [1, 0, 0]}
-        self.state = self.states_dict["off"]
+        self.state_list = ["off","on","blinking"]
+        # self.states_dict = {"off": [1, 0, 0], "on": [0, 1, 0], "blinking": [0, 0, 1]}
+        self.state = self.state_list[0]
         self.uuid = uuid.uuid4()
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
@@ -36,6 +37,9 @@ class ExecutingClient:
 
     def __bind_socket(self):
         self.socket.bind((self.client_address, self.port_address))
+        self.socket.listen(1)
+        conn, addr = self.socket.accept()
+        return conn, addr
 
     def receive_message(self):
         data, address = self.socket.recvfrom(2048)
@@ -47,39 +51,43 @@ class ExecutingClient:
         # local network segment.
         ttl = struct.pack('b', 1)
         udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        msg = create_frame(priority=2, role="EC", message_type=MessageType.dynamic_discovery, msg_uuid=uuid.uuid4(),
-                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,payload="I'm alive")
-        udp_socket.sendto(msg.encode(), (self.multicast_group,self.multicast_port))
-        print("send message: ",msg)
+        print(Role.EC)
+        msg = create_frame(priority=2, role=2, message_type=2, msg_uuid=uuid.uuid4(),
+                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                           payload="I'm alive")
+        udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        print("send message: ", msg)
         self.my_lamport_clock += 1
         data, addr = udp_socket.recvfrom(2048)
+        print("received data: ", data.decode())
         data_frame = in_filter(data.decode(), addr)
-        while (data_frame[2] != MessageType.dynamic_discovery_ack):
-            data, addr = udp_socket.recvfrom(2048)
-            data_frame = in_filter(data.decode(), addr)
+        # while (data_frame[2] != 2):
+        #     data, addr = udp_socket.recvfrom(2048)
+        #     data_frame = in_filter(data.decode(), addr)
         self.communication_partner = addr
 
     def __state_change(self, state_request):
-        if state_request in self.states_dict:
-            self.state = self.states_dict[state_request]
+        if state_request in self.state_list:
+            self.state = state_request
         else:
             logging.ERROR(
                 'state request was not possible! Possible states are "off, on, blinking" ->state has not changed!')
 
-    def __send_ack(self, address):
+    def __send_ack(self, connection):
         msg = create_frame(priority=2, role="EC", message_type=MessageType.state_change_ack, msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1,
-                           sender_clock=self.my_lamport_clock,payload="state change to: {}".format(self.state))  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
-        self.socket.sendto(msg, address)
+                           sender_clock=self.my_lamport_clock, payload="state change to: {}".format(
+                self.state))  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
+        # self.socket.sendto(msg.encode(), address)
+        connection.send(msg.encode())
         self.my_lamport_clock += 1
 
     def __check_state(self):
-        state_index = self.state.index(1)
-        if state_index == 0:
+        if self.state == "off":
             self.__off()
-        elif state_index == 1:
+        elif self.state == "on":
             self.__on()
-        elif state_index == 2:
+        elif self.state == "blinking":
             self.__blinking()
         else:
             logging.ERROR("No valid state!")
@@ -95,13 +103,15 @@ class ExecutingClient:
 
     def run(self):
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
-        self.__bind_socket()
+        connection, addr = self.__bind_socket()
         while (True):
-            data, address = self.socket.recvfrom(self.buffer_size)
-            data_frame = in_filter(data.decode(), address)
-            if (data_frame[2] == MessageType.state_change_request):
-                self.__state_change(state_request=data_frame[
-                                                      7][data_frame[7].index(
-                    "{"):])  # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
-                self.__send_ack(address=address)
+            # data = self.socket.recvfrom(self.buffer_size)
+            data = connection.recvfrom(self.buffer_size)
+            print(data)
+            data_frame = in_filter(data[0].decode(), addr)
+            print("data frame: ", data_frame)
+            if (data_frame[2] == 3):
+                self.__state_change(state_request=data_frame[7][data_frame[7].index("{")+1:data_frame[7].index("}")])
+                # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
+                self.__send_ack(connection=connection)
             self.__check_state()
