@@ -30,6 +30,7 @@ class MessageType(Enum):
 #                           ;for ack;
 # @staticmethod
 def in_filter(frame, sender_addr):
+    print("in_frame= ", frame)
     unpacked_frame = frame.split(";")
     unpacked_frame[0] = int(unpacked_frame[0])  # PRIORITY
     unpacked_frame[1] = str(unpacked_frame[1])  # ROLE

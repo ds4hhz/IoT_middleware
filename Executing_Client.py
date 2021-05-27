@@ -109,7 +109,7 @@ class ExecutingClient:
 
     def run(self):
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
-        connection, addr = self.__bind_socket()
+        connection, addr = self.__bind_socket() # tcp socket to Server
         while (True):
             data = connection.recvfrom(self.buffer_size)
             if (len(data[0]) == 0):

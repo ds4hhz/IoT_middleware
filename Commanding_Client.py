@@ -76,20 +76,34 @@ class CommandingClient:
         self.communication_partner = addr
 
     def __send_state_change_request(self, ex_uuid, state):
-        msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=uuid.uuid4(),
+        state_change_msg_id =uuid.uuid4()
+        msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         tcp_socket.connect((self.communication_partner[0], 12000))
         # tcp_socket.connect(("127.0.0.1", 12000))
         tcp_socket.send(msg.encode())
-
+        # wait for ack
+        while (True):
+            data, add = tcp_socket.recvfrom(2048)
+            if (len(data[0]) == 0):
+                print("connection lost!")
+                tcp_socket.close()
+                break
+            data_frame = in_filter(data[0].decode(), add)
+            # if ack for state_change, than update ex_dict
+            if (data_frame[2] == "state_change_ack" and data_frame[3] == state_change_msg_id):
+                self.ex_dict[ex_uuid]=state
+                break
+            else:
+                print("wrong message, wait for state_change_ack")
 
     def __send_ack(self, connection):
         msg = create_frame(priority=2, role="EC", message_type=MessageType.state_change_ack, msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1,
                            sender_clock=self.my_lamport_clock, payload="state change to: {}".format(
-                self.state))  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
+                self.state).encode())  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
         # self.socket.sendto(msg.encode(), address)
         connection.send(msg.encode())
         self.my_lamport_clock += 1
@@ -101,7 +115,7 @@ class CommandingClient:
         executing_client_uuid = str(input())
         print("please enter the state you want, possible states are \"off, on , blinking\" ")
         executing_client_state = str(input())
-        self.__send_state_change_request(executing_client_uuid,executing_client_state)
+        self.__send_state_change_request(executing_client_uuid, executing_client_state)
         # connection, addr = self.__bind_socket()
         # while (True):
         #     data = connection.recvfrom(self.buffer_size)
