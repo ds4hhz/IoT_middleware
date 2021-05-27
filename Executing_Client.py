@@ -33,6 +33,7 @@ class ExecutingClient:
         # toDo: client id
 
     def __bind_socket(self):
+        print("open TCP socket")
         self.socket.bind((self.client_address, self.port_address))
         self.socket.listen(1)
         conn, addr = self.socket.accept()
@@ -43,18 +44,19 @@ class ExecutingClient:
         self.holdback_queue.append(in_filter(data.decode(), address))
 
     def get_server(self):
+        print("open UDP multicast socket")
         udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         udp_socket.settimeout(3)
         # Set the time-to-live for messages to 1 so they do not go past the
         # local network segment.
         ttl = struct.pack('b', 1)
         udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        ec_json= {str(self.uuid): self.state}
+        ec_json = {str(self.uuid): self.state}
 
         msg = create_frame(priority=2, role="EC", message_type="dynamic_discovery", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload=json.dumps(ec_json))
-
+        print("send to multicast_group the msg: ", msg)
         udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
@@ -65,11 +67,7 @@ class ExecutingClient:
             udp_socket.close()
             self.get_server()
             return
-        print("received data: ", data.decode())
-        # data_frame = in_filter(data.decode(), addr)
-        # while (data_frame[2] != 2):
-        #     data, addr = udp_socket.recvfrom(2048)
-        #     data_frame = in_filter(data.decode(), addr)
+        print("received data from Server: ", data.decode())
         self.communication_partner = addr
 
     def __state_change(self, state_request):
@@ -79,12 +77,11 @@ class ExecutingClient:
             logging.ERROR(
                 'state request was not possible! Possible states are "off, on, blinking" ->state has not changed!')
 
-    def __send_ack(self, connection):
-        msg = create_frame(priority=2, role="EC", message_type="state_change_ack", msg_uuid=uuid.uuid4(),
+    def __send_ack(self, connection, msg_uuid):
+        msg = create_frame(priority=2, role="EC", message_type="state_change_ack", msg_uuid=msg_uuid,
                            ppid=self.uuid, fairness_assertion=1,
-                           sender_clock=self.my_lamport_clock, payload="state change to: {}".format(
-                self.state))  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
-        # self.socket.sendto(msg.encode(), address)
+                           sender_clock=self.my_lamport_clock, payload="state changed to: {}".format(self.state))
+        print("state_change_ack to server: ", msg)
         connection.send(msg.encode())
         self.my_lamport_clock += 1
 
@@ -109,23 +106,21 @@ class ExecutingClient:
 
     def run(self):
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
-        connection, addr = self.__bind_socket() # tcp socket to Server
+        connection, addr = self.__bind_socket()  # tcp socket to Server
         while (True):
             data = connection.recvfrom(self.buffer_size)
             if (len(data[0]) == 0):
-                print("connection lost!")
+                print(" EC: TCP connection lost!")
                 connection.close()
                 self.get_server()
                 self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
                 connection, addr = self.__bind_socket()
             else:
-                print(data)
                 data_frame = in_filter(data[0].decode(), addr)
-                print("data frame: ", data_frame)
+                print("received data from TCP connection: ", data_frame)
                 if (data_frame[2] == "state_change_request"):
                     self.__state_change(
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
-                    # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
                     # state wird so erwartet: [blinking]
-                    self.__send_ack(connection=connection)
+                    self.__send_ack(connection=connection, msg_uuid=data_frame[3])
             self.__check_state()

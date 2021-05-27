@@ -84,17 +84,20 @@ class CommandingClient:
         tcp_socket.connect((self.communication_partner[0], 12000))
         # tcp_socket.connect(("127.0.0.1", 12000))
         tcp_socket.send(msg.encode())
+        print("message id of change state request: ",state_change_msg_id)
         # wait for ack
         while (True):
             data, add = tcp_socket.recvfrom(2048)
-            if (len(data[0]) == 0):
+            if (len(data) == 0):
                 print("connection lost!")
                 tcp_socket.close()
                 break
-            data_frame = in_filter(data[0].decode(), add)
+            data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
-            if (data_frame[2] == "state_change_ack" and data_frame[3] == state_change_msg_id):
+            print("ack from Server: ",data_frame)
+            if (data_frame[2] == "state_change_ack" and data_frame[3] == str(state_change_msg_id)):
                 self.ex_dict[ex_uuid]=state
+                print("update EC state: ",self.ex_dict)
                 break
             else:
                 print("wrong message, wait for state_change_ack")
@@ -110,28 +113,11 @@ class CommandingClient:
 
     def run(self):
         self.get_server()  # dictionary mit executing clients
-        print(self.ex_dict)
-        print("please enter the UUID of the client for the state change requst:")
-        executing_client_uuid = str(input())
-        print("please enter the state you want, possible states are \"off, on , blinking\" ")
-        executing_client_state = str(input())
-        self.__send_state_change_request(executing_client_uuid, executing_client_state)
-        # connection, addr = self.__bind_socket()
-        # while (True):
-        #     data = connection.recvfrom(self.buffer_size)
-        #     if (len(data[0])== 0):
-        #         print("connection lost!")
-        #         connection.close()
-        #         self.get_server()
-        #         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
-        #         connection, addr = self.__bind_socket()
-        #     else:
-        #         print(data)
-        #         data_frame = in_filter(data[0].decode(), addr)
-        #         print("data frame: ", data_frame)
-        #         if (data_frame[2] == 3):
-        #             self.__state_change(state_request=data_frame[7][data_frame[7].index("{")+1:data_frame[7].index("}")])
-        #             # ToDo: Payload muss genauer definiert werden, weil Addresse des executing client und neuer state muss es beinhalten
-        #             # state wird so erwartet: {blinking}
-        #             self.__send_ack(connection=connection)
-        #     self.__check_state()
+        while(True):
+            print(self.ex_dict)
+            print("please enter the UUID of the client for the state change requst:")
+            executing_client_uuid = str(input())
+            print("please enter the state you want, possible states are \"off, on , blinking\" ")
+            executing_client_state = str(input())
+            self.__send_state_change_request(executing_client_uuid, executing_client_state)
+
