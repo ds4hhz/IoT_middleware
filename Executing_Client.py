@@ -10,13 +10,14 @@ import uuid
 import struct
 import sys
 import json
+import time
 
 
 class ExecutingClient:
     def __init__(self, address='127.0.0.1', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
                  multicast_port=10000):
         self.client_address = address
-        self.port_address = port
+        self.client_port = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
         self.buffer_size = buffer_size
         self.state_list = ["off", "on", "blinking"]
@@ -33,8 +34,8 @@ class ExecutingClient:
         # toDo: client id
 
     def __bind_socket(self):
-        print("open TCP socket")
-        self.socket.bind((self.client_address, self.port_address))
+        print("open TCP socket: ",(self.client_address,self.client_port))
+        self.socket.bind((self.client_address, self.client_port))
         self.socket.listen(1)
         conn, addr = self.socket.accept()
         return conn, addr
@@ -51,7 +52,7 @@ class ExecutingClient:
         # local network segment.
         ttl = struct.pack('b', 1)
         udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        ec_json = {str(self.uuid): self.state}
+        ec_json = {str(self.uuid): [self.state, self.client_address, self.client_port]}
 
         msg = create_frame(priority=2, role="EC", message_type="dynamic_discovery", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
@@ -109,12 +110,17 @@ class ExecutingClient:
         connection, addr = self.__bind_socket()  # tcp socket to Server
         while (True):
             data = connection.recvfrom(self.buffer_size)
+            print("length of received data: ",len(data[0]))
             if (len(data[0]) == 0):
-                print(" EC: TCP connection lost!")
+                # print(" EC: TCP connection lost!")
                 connection.close()
-                self.get_server()
-                self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
-                connection, addr = self.__bind_socket()
+                time.sleep(1)
+                self.socket.listen(1)
+                connection, addr = self.socket.accept()
+                # self.get_server()
+                # self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
+                # connection, addr = self.__bind_socket()
+                continue
             else:
                 data_frame = in_filter(data[0].decode(), addr)
                 print("received data from TCP connection: ", data_frame)

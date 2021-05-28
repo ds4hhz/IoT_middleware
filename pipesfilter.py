@@ -25,8 +25,8 @@ class MessageType(Enum):
 
 # FRAME-Structure
 # POSITIONS:
-#    0    |  1 | 2         |   3    | 4  |         5        |      6     |    7  |   8  |
-# PRIORITY;ROLE;MESSAGE_TYP;MSG-UUID;PPID;FAIRNESS ASSERTION;SENDER-CLOCK;PAYLOAD;SENDER
+#    0    |  1 | 2         |   3    | 4  |         5        |      6     |    7  |      8       |  9  |
+# PRIORITY;ROLE;MESSAGE_TYP;MSG-UUID;PPID;FAIRNESS ASSERTION;SENDER-CLOCK;PAYLOAD;Message length;SENDER
 #                           ;for ack;
 # @staticmethod
 def in_filter(frame, sender_addr):

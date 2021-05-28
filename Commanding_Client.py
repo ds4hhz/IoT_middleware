@@ -8,7 +8,7 @@ from pipesfilter import MessageType
 from pipesfilter import in_filter
 import uuid
 import struct
-import sys
+import time
 import json
 
 
@@ -68,15 +68,10 @@ class CommandingClient:
         print("received data: ", data.decode())
         data = in_filter(data.decode(), addr)
         self.ex_dict = json.loads(data[7])
-        print(self.ex_dict)
-        # data_frame = in_filter(data.decode(), addr)
-        # while (data_frame[2] != 2):
-        #     data, addr = udp_socket.recvfrom(2048)
-        #     data_frame = in_filter(data.decode(), addr)
         self.communication_partner = addr
 
     def __send_state_change_request(self, ex_uuid, state):
-        state_change_msg_id =uuid.uuid4()
+        state_change_msg_id = uuid.uuid4()
         msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
@@ -84,7 +79,8 @@ class CommandingClient:
         tcp_socket.connect((self.communication_partner[0], 12000))
         # tcp_socket.connect(("127.0.0.1", 12000))
         tcp_socket.send(msg.encode())
-        print("message id of change state request: ",state_change_msg_id)
+        print("length of the message: ", len(msg.encode()))
+        print("message id of change state request: ", state_change_msg_id)
         # wait for ack
         while (True):
             data, add = tcp_socket.recvfrom(2048)
@@ -94,10 +90,11 @@ class CommandingClient:
                 break
             data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
-            print("ack from Server: ",data_frame)
+            print("ack from Server: ", data_frame)
             if (data_frame[2] == "state_change_ack" and data_frame[3] == str(state_change_msg_id)):
-                self.ex_dict[ex_uuid]=state
-                print("update EC state: ",self.ex_dict)
+                self.ex_dict[ex_uuid] = state
+                print("update EC state: ", self.ex_dict)
+                tcp_socket.close()
                 break
             else:
                 print("wrong message, wait for state_change_ack")
@@ -113,11 +110,15 @@ class CommandingClient:
 
     def run(self):
         self.get_server()  # dictionary mit executing clients
-        while(True):
+        while (True):
             print(self.ex_dict)
+            if (len(self.ex_dict) == 0):
+                print("update list of ECs")
+                time.sleep(5)
+                self.get_server()
+                continue
             print("please enter the UUID of the client for the state change requst:")
             executing_client_uuid = str(input())
             print("please enter the state you want, possible states are \"off, on , blinking\" ")
             executing_client_state = str(input())
             self.__send_state_change_request(executing_client_uuid, executing_client_state)
-
