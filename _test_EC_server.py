@@ -55,6 +55,7 @@ class Server:
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
+            self.__dynamic_discovery_ack(data_frame,address)
         return data_frame, address
 
     def __dynamic_discovery_ack(self, data_frame, address):
@@ -122,7 +123,7 @@ class Server:
         self.__create_multicast_socket()
         while (True):
             data_frame, address = self.__dynamic_discovery()
-            self.__dynamic_discovery_ack(data_frame, address)
+            # self.__dynamic_discovery_ack(data_frame, address)
             print("ec_dict in udp thread: ",self.ec_dict)
 
     def run_tcp_socket(self):

@@ -44,26 +44,33 @@ class CommandingClient:
         data, address = self.socket.recvfrom(2048)
         self.holdback_queue.append(in_filter(data.decode(), address))
 
-    def get_server(self):  # ToDO: get list of executing client
-        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_socket.settimeout(3)
-        # Set the time-to-live for messages to 1 so they do not go past the
-        # local network segment.
+    def __create_multicast_socket(self):
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.settimeout(3)
         ttl = struct.pack('b', 1)
-        udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+        self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+
+    def __get_server(self):  # ToDO: get list of executing client
+        # udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # udp_socket.settimeout(3)
+        # # Set the time-to-live for messages to 1 so they do not go past the
+        # # local network segment.
+        # ttl = struct.pack('b', 1)
+        # udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
         msg = create_frame(priority=2, role="CC", message_type="ec_list_query", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="Send me a list of all executing clients")
 
-        udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
-            data, addr = udp_socket.recvfrom(2048)
+            data, addr = self.udp_socket.recvfrom(2048)
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
-            udp_socket.close()
-            self.get_server()
+            self.udp_socket.close()
+            self.__create_multicast_socket()
+            self.__get_server()
             return
         print("received data: ", data.decode())
         data = in_filter(data.decode(), addr)
@@ -108,17 +115,23 @@ class CommandingClient:
         connection.send(msg.encode())
         self.my_lamport_clock += 1
 
+
     def run(self):
-        self.get_server()  # dictionary mit executing clients
+        self.__create_multicast_socket()
+        self.__get_server()  # dictionary mit executing clients
         while (True):
             print(self.ex_dict)
             if (len(self.ex_dict) == 0):
                 print("update list of ECs")
                 time.sleep(5)
-                self.get_server()
+                self.__get_server()
                 continue
-            print("please enter the UUID of the client for the state change requst:")
+            print("please enter the UUID of the client for the state change request or type \"update\" for update of ECs:")
             executing_client_uuid = str(input())
+            if(executing_client_uuid=="update"):
+                self.__get_server()
+                continue
             print("please enter the state you want, possible states are \"off, on , blinking\" ")
             executing_client_state = str(input())
             self.__send_state_change_request(executing_client_uuid, executing_client_state)
+            self.__get_server() # update states of ECs
