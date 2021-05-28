@@ -97,20 +97,19 @@ class ExecutingClient:
             logging.ERROR("No valid state!")
 
     def __off(self):
-        print("client is off")
+        print("client {} is off".format(self.uuid))
 
     def __on(self):
-        print(("client is on"))
+        print(("client {} is on".format(self.uuid)))
 
     def __blinking(self):
-        print("client is blinking")
+        print("client {} is blinking".format(self.uuid))
 
     def run(self):
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
         connection, addr = self.__bind_socket()  # tcp socket to Server
         while (True):
             data = connection.recvfrom(self.buffer_size)
-            print("length of received data: ",len(data[0]))
             if (len(data[0]) == 0):
                 # print(" EC: TCP connection lost!")
                 connection.close()

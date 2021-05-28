@@ -10,7 +10,7 @@ import sys
 import json
 import multiprocessing
 from threading import Thread
-from sched import scheduler
+import sched
 
 ec_dict = {}
 
@@ -26,6 +26,11 @@ class Server:
         self.ec_dict = ec_dict
         self.CC_connection_list = []
         self.CC_address_list = []
+
+        # heartbeat
+        self.heartbeat_period = 10
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
 
     def __create_multicast_socket(self):
         # Create the socket
@@ -117,10 +122,16 @@ class Server:
             return False
 
     def __check_EC_state(self):
+        del_list=[]
         for key, item in self.ec_dict.items():
             addr_tuple = (item[1], item[2])
             ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            ex_tcp_con.connect(addr_tuple)
+            try:
+                ex_tcp_con.connect(addr_tuple)
+            except:
+                print("Executing client {} not reachable!".format(key))
+                del_list.append(key)
+                continue
             ex_tcp_con.send(create_frame(1, "S", "heartbeat", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
                                          "give me your state").encode())
             ex_tcp_con.settimeout(2)
@@ -132,8 +143,13 @@ class Server:
                 for k, v in temp_dict.items():
                     self.ec_dict[k] = v
             except:
-                del ec_dict[key]
+                del_list.append(key)
+        for key in del_list:
+            del self.ec_dict[key]
         print("EC_dict updated")
+        print("EC_dict: ", self.ec_dict)
+        self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
+
 
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
@@ -167,6 +183,9 @@ class Server:
                 continue
                 # self.__open_tcp_socket()
 
+    def run_heartbeat(self):
+        self.scheduler.run()
+
     def run_all(self):
         # tcp_process = multiprocessing.Process(target=server.run_tcp_socket, name="tcp_process")
         # udp_process = multiprocessing.Process(target=server.run_dynamic_discovery, name="udp_process")
@@ -174,10 +193,12 @@ class Server:
         # udp_process.start()
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
+        heartbeat_thread = Thread(target=self.run_heartbeat, name="heartbeat_thread")
+        heartbeat_thread.start()
         tcp_thread.start()
         udp_thread.start()
 
-        #ToDO: scheduler for heartbeat
+        # ToDO: scheduler for heartbeat
 
         # multicast_group = '224.3.29.71'
 
