@@ -10,6 +10,7 @@ import sys
 import json
 import multiprocessing
 from threading import Thread
+from sched import scheduler
 
 ec_dict = {}
 
@@ -55,7 +56,7 @@ class Server:
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
-            self.__dynamic_discovery_ack(data_frame,address)
+            self.__dynamic_discovery_ack(data_frame, address)
         return data_frame, address
 
     def __dynamic_discovery_ack(self, data_frame, address):
@@ -112,7 +113,27 @@ class Server:
             ex_tcp_con.close()
             return True
         else:
+            ex_tcp_con.close()
             return False
+
+    def __check_EC_state(self):
+        for key, item in self.ec_dict.items():
+            addr_tuple = (item[1], item[2])
+            ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            ex_tcp_con.connect(addr_tuple)
+            ex_tcp_con.send(create_frame(1, "S", "heartbeat", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
+                                         "give me your state").encode())
+            ex_tcp_con.settimeout(2)
+            try:
+                data = ex_tcp_con.recv(2048)
+                data_frame = in_filter(data.decode(), addr_tuple)
+                print("Save state of EC")
+                temp_dict = json.loads(data_frame[7])
+                for k, v in temp_dict.items():
+                    self.ec_dict[k] = v
+            except:
+                del ec_dict[key]
+        print("EC_dict updated")
 
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
@@ -124,25 +145,22 @@ class Server:
         while (True):
             data_frame, address = self.__dynamic_discovery()
             # self.__dynamic_discovery_ack(data_frame, address)
-            print("ec_dict in udp thread: ",self.ec_dict)
+            print("ec_dict in udp thread: ", self.ec_dict)
 
     def run_tcp_socket(self):
         self.__open_tcp_socket()  # socket for CC communication
         while (True):
             data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_state_change_request()
             if (data_received):
-                print("EC_dict: ",self.ec_dict)
                 EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
                                                                                   state_request, EC_address)
                 if (got_state_change_request):
                     if (data_received):
                         self.__state_change_ack_to_CC(payload, message_id, state_request)
-                        print("message id of change ack: ", message_id)
                     else:
                         # self.run_tcp_socket()
                         continue
-                        return
                 else:
                     continue
             else:
@@ -158,6 +176,8 @@ class Server:
         udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
         tcp_thread.start()
         udp_thread.start()
+
+        #ToDO: scheduler for heartbeat
 
         # multicast_group = '224.3.29.71'
 

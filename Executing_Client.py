@@ -129,4 +129,12 @@ class ExecutingClient:
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
                     # state wird so erwartet: [blinking]
                     self.__send_ack(connection=connection, msg_uuid=data_frame[3])
+                elif(data_frame[2]=="heartbeat"):
+                    ec_json = {str(self.uuid): [self.state, self.client_address, self.client_port]}
+                    msg = create_frame(priority=2, role="EC", message_type="dynamic_discovery", msg_uuid=uuid.uuid4(),
+                                       ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                                       payload=json.dumps(ec_json))
+                    print("send to multicast_group the msg: ", msg)
+                    connection.send(msg.encode())
+                    self.my_lamport_clock += 1
             self.__check_state()
