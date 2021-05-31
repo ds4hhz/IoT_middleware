@@ -17,9 +17,11 @@ class DynamicDiscovery(threading.Thread):
         self.ip = configurations["machine_ipv4"]
         self.lts = 1
 
+        self.discovermsguuid = uuid.uuid4()
+
     def run(self):
         while True:
-            time.sleep(10)
+            time.sleep(20)
             self.send_mssg()
 
     def send_mssg(self):
@@ -27,23 +29,23 @@ class DynamicDiscovery(threading.Thread):
             pipesfilter.create_frame(priority=0,
                                      role="S",
                                      message_type="DD",
-                                     msg_uuid=str(uuid.uuid4()),
+                                     msg_uuid=str(self.discovermsguuid),
                                      ppid=self.server_uuid,
                                      fairness_assertion=0,
                                      sender_clock=0,
                                      payload="Who is there?",
-                                     sender=self.ip)[0])
+                                     sender=str(self.ip))[0])
 
     def answerToHosts(self, frame):
         self.communicationchannels.send_bc_socket(pipesfilter.create_frame(priority=0,
                                                                              role="S",
                                                                              message_type="ACK",
-                                                                             msg_uuid=frame[3],
+                                                                             msg_uuid=frame[4],
                                                                              ppid=self.server_uuid,
                                                                              fairness_assertion=0,
                                                                              sender_clock=0,
                                                                              payload="I am alive",
-                                                                             sender=None)[0])
+                                                                             sender=str(self.ip))[0])
 
     def answerToClients(self, frame):
         # answer to exploratory (CC OR EC)!
@@ -56,7 +58,7 @@ class DynamicDiscovery(threading.Thread):
                                                                                  fairness_assertion=0,
                                                                                  sender_clock=0,
                                                                                  payload="I am alive",
-                                                                                 sender=None)[0])
+                                                                                 sender=str(self.ip))[0])
 
     def setHostCount(self, count):
         self.hc = count

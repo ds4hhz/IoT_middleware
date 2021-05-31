@@ -23,7 +23,6 @@ class BroadcastListener(threading.Thread):
                 data, addr = self.socket.recvfrom(1024)  # buffer size is 1024 bytes
                 if data:
                     # incoming frame...
-                    # self.mssg_queue.put([addr,  data.decode()])
                     self.mssg_queue.put(pf.in_filter(data.decode("utf-8"), addr))
 
         except Exception as e:

@@ -23,6 +23,8 @@ cfg = {
     "hb_intervall": 2,
     "hb_timeout": 6,
 
+    "ELECTION_TIMEOUT": 9,
+
     "server_response_timeout": 5,
 
 

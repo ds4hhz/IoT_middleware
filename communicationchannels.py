@@ -1,12 +1,8 @@
 import socket
-
-import configurations
 from configurations import cfg as defcfg
 import struct
-import threading
-import pipesfilter
 
-class Communication(threading.Thread):
+class Communication():
 
     def __init__(self, cfg):
         if cfg == None:
@@ -16,6 +12,8 @@ class Communication(threading.Thread):
 
         self.binded_bc = self.bind_broadcastlistener()
         self.binded_mc = self.bind_multicastlistener()
+        self.binded_unicast = self.bind_unicast()
+
         #self.binded_tcp_sock = self.binded_tcp_socket()
         #self.binded_udp_unicast = self.get_unicast_socket()
         #self.binded_tcp = self.get_tcp_socket()
@@ -30,14 +28,12 @@ class Communication(threading.Thread):
 
     def send_mc_socket(self, message_frame):
         broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        broadcast_socket.sendto(message_frame, (self.configs["multicast_group"], self.configs["multicast_port"]))
+        broadcast_socket.sendto(str.encode(message_frame), (self.configs["multicast_group"], self.configs["multicast_port"]))
         broadcast_socket.close()
 
     def send_udp_unicast(self, message_frame, receiver):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.sendto(str.encode(message_frame), (receiver, self.configs["multicast_port"]))
-        # workaround broadcasting...
-
+        unicast = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        unicast.sendto(str.encode(message_frame), (receiver, self.configs["machine_ipv4"]))
 
     """def binded_tcp_socket(self):
         tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -70,21 +66,11 @@ class Communication(threading.Thread):
     def get_broadcastlistener(self):
         return self.binded_bc
 
-    def send_msg(self, typeofmessage, dataframe, destination):
-        if typeofmessage == "broadcast":
-            self.binded_bc.sendto(dataframe, (self.configs["brc_addr"], self.configs["brc_port"]))
-
-        if typeofmessage == "multicast":
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.sendto(dataframe, (self.configs["multicast_group"], self.configs["multicast_port"]))
-
-        if typeofmessage == "udp_unicast":
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.sendto(pipesfilter.outFilter(dataframe), dataframe[9], self.configs["multicast_port"])
+    def bind_unicast(self):
+        unicast = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        unicast.bind((self.configs["machine_ipv4"], self.configs["unicast_port"]))
 
 
-        if typeofmessage == "tcp_unicast":
-            pass
 
 
 

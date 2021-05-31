@@ -1,5 +1,4 @@
 import os
-import threading
 import uuid
 
 from configurations import cfg as configurations
@@ -10,9 +9,10 @@ from communicationchannels import Communication
 from election2 import Election
 import pipesfilter
 from dynamicdiscovery import DynamicDiscovery
+from unicastlistener import UnicastListener
+from heartbeat import HeartbeatThread
 
 import time
-import queue
 
 
 # toDO: zykliches senden der states an die commanding clients
@@ -20,7 +20,7 @@ import queue
 class Server:
 
     def __init__(self):
-
+        self.stateclock = 0
         self.ToS = "S"
         self.ip = configurations["machine_ipv4"]
         self.cfg = configurations
@@ -33,6 +33,7 @@ class Server:
 
         # w8 for several seconds
         self.pending_election = False
+        self.lastheartbeatsend = 0
 
         # configurate communication channels
         self.communicationchannels = Communication(configurations)
@@ -49,59 +50,76 @@ class Server:
 
         self.discovery = DynamicDiscovery(self.server_uuid, self.my_ppid, self.communicationchannels)
         self.discovery.daemon = True
-        election = Election(self.server_uuid, self.ip, self.communicationchannels)
-        election.daemon = True
+        self.election = Election(self.server_uuid, self.ip, self.communicationchannels)
+        self.election.daemon = True
+        self.unicastlistener = UnicastListener(configurations, self.communicationchannels.get_multicastlistener())
+        self.unicastlistener.daemon = True
+        self.heartbeat_thread = HeartbeatThread(self.election.electionboard, self.communicationchannels, self.server_uuid, election)
 
+        self.unicastlistener.start()
         brclistener.start()
         mclistener.start()
         self.discovery.start()
-        election.start()
+        self.election.start()
+
         try:
             while self.running is True:
-                time.sleep(2)
-                print("my server uuid " + str(self.server_uuid))
-                print(election.electionboard)
-                #self.pending_election = election.electionstarted
+
+                # self.heartbeat_thread.updateHostboard(self.election.electionboard["HOST"])
+                #print(self.discovery.hc)
+                #print(self.election.electionboard)
 
                 if not brclistener.mssg_queue.empty():
                     intercepted_broadcast = brclistener.getFromQueue()
-                    print(intercepted_broadcast)
                     # answer to CC or EC
                     if intercepted_broadcast[2] == "DD" \
-                            and intercepted_broadcast[1] != "S":
+                            and (intercepted_broadcast[1] == "CC" or intercepted_broadcast[1] == "EC"):
                         self.discovery.answerToClients(intercepted_broadcast)
 
                     # set election to True if election is pending
                     # => @ bully algorithm no future hosts shall join the network for safety reasons
                     if intercepted_broadcast[2] == "DD" \
                             and intercepted_broadcast[1] == "S" \
+                            and intercepted_broadcast[8] != str(self.ip) \
                             and self.pending_election is not True \
-                            and intercepted_broadcast[4] not in election.electionboard["PPID"]:
+                            and intercepted_broadcast[4] not in self.election.electionboard["PPID"]:
                         self.discovery.answerToHosts(intercepted_broadcast)
+                        self.election.electionboard["HOST"].append(intercepted_broadcast[8])
+                        self.election.electionboard["PPID"].append(
+                            intercepted_broadcast[4])  # append uuid instead ppid => more unique
+                        self.election.electionboard["LAST_ACTIVITY_TIMESTAMP"].append(time.time())
+                        self.election.electionboard["HIGHER_UUIDS"].append(False)
+                        self.discovery.setHostCount(len(self.election.electionboard["HOST"]))
 
                     if intercepted_broadcast[1] == "S" \
-                            and intercepted_broadcast[8] != self.ip \
-                            and intercepted_broadcast[8] not in election.electionboard["HOST"]\
-                            and self.pending_election is not True:
-                        election.electionboard["HOST"].append(intercepted_broadcast[8])
-                        election.electionboard["PPID"].append(
-                            intercepted_broadcast[3])  # append uuid instead ppid => more unique
-                        election.electionboard["LAST_ACTIVITY_TIMESTAMP"].append(time.time())
-                        election.electionboard["SIGNED"].append(False)
-                        self.discovery.setHostCount(len(election.electionboard["HOST"]))
+                            and intercepted_broadcast[2] == "ACK" \
+                            and intercepted_broadcast[8] != str(self.ip) \
+                            and intercepted_broadcast[4] != str(self.server_uuid) \
+                            and intercepted_broadcast[8] not in self.election.electionboard["HOST"] \
+                            and self.pending_election != True:
+                        self.election.electionboard["HOST"].append(intercepted_broadcast[8])
+                        self.election.electionboard["PPID"].append(
+                            intercepted_broadcast[4])  # append uuid instead ppid => more unique
+                        self.election.electionboard["LAST_ACTIVITY_TIMESTAMP"].append(time.time())
+                        self.election.electionboard["HIGHER_UUIDS"].append(False)
+                        self.election.electionboard["LEAD_CONFIRMATIONS"].append(False)
+                        self.discovery.setHostCount(len(self.election.electionboard["HOST"]))
 
-#               -----------------------------------------------------------------------------------------------------
+                #   -----------------------------------------------------------------------------------------------------
 
                 if not mclistener.mssg_queue.empty():
                     intercepted_mc = mclistener.getFromQueue()
-                    print("-- pending interception --")
-                    interception_time = time.time()
-                    if intercepted_mc[2] == "HB" or intercepted_mc[2] == "EL":
-                        election.incoming_pipe.put(intercepted_mc, interception_time)
-                        if intercepted_mc[8] in election.electionboard["HOST"]:
-                            election.electionboard["LAST_ACTIVITY_TIMESTAMP"][election.electionboard["HOST"].index(intercepted_mc[8])] = time.time()
+                    if (intercepted_mc[2] == "HB" or intercepted_mc[2] == "EL") and intercepted_mc[8] != str(self.ip):
+                        self.election.incoming_pipe.put(intercepted_mc)
+                        print(intercepted_mc)
 
+                #   -----------------------------------------------------------------------------------------------------
 
+                if not self.unicastlistener.mssg_queue.empty():
+                    intercepted_unicast = self.unicastlistener.getFromQueue()
+                    if (intercepted_unicast[2] == "HB" or intercepted_unicast[2] == "EL") and intercepted_unicast[8] != str(self.ip):
+                        self.election.incoming_pipe.put(intercepted_unicast)
+                        print(intercepted_unicast)
 
 
         except Exception as e:
@@ -111,15 +129,33 @@ class Server:
             brclistener.join()
             mclistener.join()
             self.discovery.join()
-            election.join()
+            self.election.join()
+            self.unicastlistener.join()
 
             brclistener.stop()
             mclistener.stop()
             self.discovery.stop()
-            election.join()
-        # hearbeat_thread.join()
-        # hearbeat_thread.stop()
+            self.election.join()
+            self.unicastlistener.stop()
+            # self.heartbeat_thread.join()
+            # self.heartbeat_thread.stop()
 
     def mirror_msg(self):
         pass
 
+    """def __hearbeat(self):
+        if float(time.time()) - float(self.lastheartbeatsend) > 2 and self.election.elected == True and len(self.election.electionboard["HOST"]) !=0:
+            self.lastheartbeatsend = time.time()
+            print("last hearbeattime: " + str(self.lastheartbeatsend))
+            for host in self.election.electionboard["HOST"]:
+                self.communicationchannels.send_udp_unicast(
+                    pipesfilter.create_frame(priority=0,
+                                             role="S",
+                                             message_type="HB",
+                                             msg_uuid=uuid.uuid4(),
+                                             ppid=self.server_uuid,
+                                             fairness_assertion=0,
+                                             sender_clock=0,
+                                             payload="I am Alive",
+                                             sender=str(self.cfg["machine_ipv4"]))[0], host)
+"""

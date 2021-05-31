@@ -22,9 +22,7 @@ class MulticastListener(threading.Thread):
                 data, addr = self.socket.recvfrom(1024)  # buffer size is 1024 bytes
                 if data:
                     # incoming frame...
-                    # self.mssg_queue.put([addr,  data.decode()])
                     self.mssg_queue.put(pf.in_filter(data.decode(), addr))
-                    print("MC")
         except Exception as e:
             print(e)
 

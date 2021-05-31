@@ -1,24 +1,4 @@
 
-from enum import Enum
-
-
-class Role(Enum):
-    S = 0
-    CC = 1
-    EC = 2
-
-
-class MessageType(Enum):
-    msg_ack = 0
-    dynamic_discovery = 1
-    state_change_request = 2
-    state_change_ack = 3
-    election = 4
-    leader_msg = 5
-    replication = 6
-    replication_ack = 7
-    heartbeat = 8
-
 #todo: Prios für messages bestimmen
 
 # FRAME-Structure
@@ -28,7 +8,7 @@ class MessageType(Enum):
 
 
 def in_filter(frame, sender_addr):
-    unpacked_frame = frame.split(",")
+    unpacked_frame = frame.split(";")
     unpacked_frame[0] = int(unpacked_frame[0])  # PRIORITY
     unpacked_frame[1] = str(unpacked_frame[1])  # ROLE
     unpacked_frame[2] = str(unpacked_frame[2])  # MESSAGE_TYPE
@@ -47,6 +27,5 @@ def create_frame(priority, role, message_type, msg_uuid, ppid, fairness_assertio
                     str(sender_clock), str(payload), str(sender)]
     receiver = message_list[8]
     del message_list[-1]
-    msg_string = ",".join(message_list)
-    print(msg_string)
+    msg_string = ";".join(message_list)
     return [msg_string, receiver]
