@@ -19,18 +19,69 @@ class Server:
     def __init__(self):
         global ec_dict
         self.multicast_group = '224.3.29.71'
+        self.multicast_port = 10000
         self.tcp_addr = ("10.0.2.15", 12000)
-        self.server_address = ('', 10000)
+        self.server_address =  ('', 10000)
         self.my_clock = 0
         self.my_uuid = uuid.uuid4()
         self.ec_dict = ec_dict
         self.CC_connection_list = []
         self.CC_address_list = []
 
+        self.is_leader = False
+        self.group_member_list = []
+        self.discovery_counter = 0
+
         # heartbeat
         self.heartbeat_period = 10
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
+
+    def __create_multicast_socket_member_discovery(self):
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.settimeout(3)
+        ttl = struct.pack('b', 1)
+        self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
+
+    def __get_group_members(self):
+        msg = create_frame(priority=2, role="S", message_type="group_discovery", msg_uuid=uuid.uuid4(),
+                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
+                           payload="Get group member ids")
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        self.my_clock += 1
+        try:
+            data, addr = self.udp_socket.recvfrom(2048)
+        except socket.timeout:
+            print("time out! No response!")
+            print("try again!")
+            self.discovery_counter += 1
+            self.udp_socket.close()
+            if (self.discovery_counter >= 4):
+                self.is_leader = True  # lonely group member
+                return
+            self.__create_multicast_socket_member_discovery()
+            self.__get_group_members()
+            return
+        print("received data: ", data.decode())
+        data_frame = in_filter(data.decode(), addr)
+        if (data_frame[2] == "group_discovery_ack"):
+            self.group_member_list.append(data_frame[7])
+            sorted(self.group_member_list, reverse=True)  # absteigende Sortierung
+            print("group members: ", self.group_member_list)
+            self.udp_socket.close()
+
+    def __group_discovery_ack(self, address):
+        msg = create_frame(priority=2, role="S", message_type="group_discovery_ack", msg_uuid=uuid.uuid4(),
+                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
+                           payload=str(self.my_uuid))
+        self.multi_sock.sendto(msg.encode(), address)
+        self.my_clock += 1
+
+    def __election(self):
+        pass
+
+    def __replication(self):
+        pass
 
     def __create_multicast_socket(self):
         # Create the socket
@@ -43,9 +94,9 @@ class Server:
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    def __dynamic_discovery(self):
+    def __dynamic_discovery(self):  # messages over multicast group
         data, address = self.multi_sock.recvfrom(2048)
-        print("data from Client over multicast_group: ", data)
+        print("data over multicast_group: ", data)
         data_frame = in_filter(data.decode(), address)
         if (data_frame[1] == "CC" and data_frame[2] == "ec_list_query"):
             # send dict of all known executing clients with state
@@ -62,6 +113,8 @@ class Server:
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
             self.__dynamic_discovery_ack(data_frame, address)
+        elif (data_frame[1] == "S" and data_frame[2] == "group_discovery"):  # group member request
+            self.__group_discovery_ack(address)
         return data_frame, address
 
     def __dynamic_discovery_ack(self, data_frame, address):
@@ -122,7 +175,7 @@ class Server:
             return False
 
     def __check_EC_state(self):
-        del_list=[]
+        del_list = []
         for key, item in self.ec_dict.items():
             addr_tuple = (item[1], item[2])
             ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -149,7 +202,6 @@ class Server:
         print("EC_dict updated")
         print("EC_dict: ", self.ec_dict)
         self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
-
 
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
@@ -183,37 +235,44 @@ class Server:
                 continue
                 # self.__open_tcp_socket()
 
-    def run_heartbeat(self):
+    def run_heartbeat_EC(self):
         self.scheduler.run()
 
-    def run_all(self):
-        # tcp_process = multiprocessing.Process(target=server.run_tcp_socket, name="tcp_process")
-        # udp_process = multiprocessing.Process(target=server.run_dynamic_discovery, name="udp_process")
-        # tcp_process.start()
-        # udp_process.start()
+    def run_member_discovery(self):
+        self.__create_multicast_socket_member_discovery()
+        self.__get_group_members()
+
+    def run_all(self, server):
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
-        heartbeat_thread = Thread(target=self.run_heartbeat, name="heartbeat_thread")
+        heartbeat_thread = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread")
         heartbeat_thread.start()
-        tcp_thread.start()
+        self.run_member_discovery()
         udp_thread.start()
+        if (self.is_leader):
+            print("I'm the leader!")
+            tcp_thread.start()
+        else:
+            print("I'm a secondary")
+
 
         # ToDO: scheduler for heartbeat
 
         # multicast_group = '224.3.29.71'
 
 
-server = Server()
-server.run_all()
-
-# tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
-# udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
-# tcp_thread.start()
-# udp_thread.start()
-
-
-# tcp_process = multiprocessing.Process(target=server.run_tcp_socket, name="tcp_process")
-# udp_process = multiprocessing.Process(target=server.run_dynamic_discovery, name="udp_process")
-# tcp_process.start()
-# udp_process.start()
-# server.run_tcp_socket()
+# server = Server()
+server1 = Server()
+server2 = Server()
+server3 = Server()
+# server.run_all()
+server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
+server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
+# server3_process = multiprocessing.Process(target=server3.run_all, name="server3", args=(server3,))
+#
+# server1_process.start()
+# time.sleep(1)
+# server2_process.start()
+# time.sleep(1)
+# server3_process.start()
+server3.run_all(server3)

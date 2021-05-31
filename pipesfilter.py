@@ -19,6 +19,8 @@ class MessageType(Enum):
     replication_ack = 8
     heartbeat = 9
     ec_list_query = 10
+    group_discovery = 11
+    group_discovery_ack = 12
 
 
 # todo: Prios für messages bestimmen

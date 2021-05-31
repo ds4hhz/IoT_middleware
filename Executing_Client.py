@@ -27,11 +27,6 @@ class ExecutingClient:
         self.multicast_port = multicast_port
         self.my_lamport_clock = 0
         self.communication_partner = ""
-        # self.messenger_obj = Messenger(process_id=self.uuid, ToS=Role.EC,
-        #                                multicast_group="233.33.33.33", multicast_port=9950,
-        #                                bcn="192.168.1.255",
-        #                                bcp=10500)
-        # toDo: client id
 
     def __bind_socket(self):
         print("open TCP socket: ",(self.client_address,self.client_port))
@@ -111,14 +106,10 @@ class ExecutingClient:
         while (True):
             data = connection.recvfrom(self.buffer_size)
             if (len(data[0]) == 0):
-                # print(" EC: TCP connection lost!")
                 connection.close()
                 time.sleep(1)
                 self.socket.listen(1)
                 connection, addr = self.socket.accept()
-                # self.get_server()
-                # self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
-                # connection, addr = self.__bind_socket()
                 continue
             else:
                 data_frame = in_filter(data[0].decode(), addr)
