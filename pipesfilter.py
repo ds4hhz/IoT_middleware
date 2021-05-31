@@ -21,6 +21,8 @@ class MessageType(Enum):
     ec_list_query = 10
     group_discovery = 11
     group_discovery_ack = 12
+    tcp_port_request = 13
+    tcp_port_request_ack = 14
 
 
 # todo: Prios für messages bestimmen

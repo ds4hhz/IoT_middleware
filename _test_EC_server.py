@@ -16,12 +16,12 @@ ec_dict = {}
 
 
 class Server:
-    def __init__(self):
+    def __init__(self, tcp_address):
         global ec_dict
         self.multicast_group = '224.3.29.71'
         self.multicast_port = 10000
-        self.tcp_addr = ("", 12000) #("10.0.2.15", 12000)
-        self.server_address =  ('', 10000)
+        self.tcp_addr = tcp_address  # ("", 12000) #("10.0.2.15", 12000)
+        self.server_address = ('', 10000)
         self.my_clock = 0
         self.my_uuid = uuid.uuid4()
         self.ec_dict = ec_dict
@@ -77,6 +77,13 @@ class Server:
         self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
+    def __send_tcp_port(self, address):
+        msg = create_frame(priority=2, role="S", message_type="tcp_port_request_ack", msg_uuid=uuid.uuid4(),
+                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
+                           payload=self.tcp_addr[1])
+        self.multi_sock.sendto(msg.encode(), address)
+        self.my_clock += 1
+
     def __election(self):
         pass
 
@@ -86,13 +93,16 @@ class Server:
     def __create_multicast_socket(self):
         # Create the socket
         self.multi_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Bind to the server address
-        self.multi_sock.bind(self.server_address)
+
         # Tell the operating system to add the socket to the multicast group
         # on all interfaces.
+        self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Bind to the server address
+        self.multi_sock.bind(self.server_address)
         group = socket.inet_aton(self.multicast_group)
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+        # self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.SO_REUSEPORT, mreq)
 
     def __dynamic_discovery(self):  # messages over multicast group
         data, address = self.multi_sock.recvfrom(2048)
@@ -113,8 +123,10 @@ class Server:
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
             self.__dynamic_discovery_ack(data_frame, address)
-        elif (data_frame[1] == "S" and data_frame[2] == "group_discovery"):  # group member request
+        elif (data_frame[1] == "S" and data_frame[2] == "tcp_port_request"):  # group member request
             self.__group_discovery_ack(address)
+        elif (data_frame[2] == "tcp_port_request"):  # send tcp socket port
+            self.__send_tcp_port(address)
         return data_frame, address
 
     def __dynamic_discovery_ack(self, data_frame, address):
@@ -247,14 +259,14 @@ class Server:
         udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
         heartbeat_thread = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread")
         heartbeat_thread.start()
-        self.run_member_discovery()
         udp_thread.start()
+        self.run_member_discovery()
+        tcp_thread.start()
         if (self.is_leader):
             print("I'm the leader!")
-            tcp_thread.start()
+
         else:
             print("I'm a secondary")
-
 
         # ToDO: scheduler for heartbeat
 
@@ -262,9 +274,9 @@ class Server:
 
 
 # server = Server()
-server1 = Server()
-server2 = Server()
-server3 = Server()
+server1 = Server(("", 12000))
+server2 = Server(("", 12001))
+server3 = Server(("", 12002))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
