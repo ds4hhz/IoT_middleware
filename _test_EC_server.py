@@ -20,7 +20,7 @@ class Server:
         global ec_dict
         self.multicast_group = '224.3.29.71'
         self.multicast_port = 10000
-        self.tcp_addr = ("10.0.2.15", 12000)
+        self.tcp_addr = ("", 12000) #("10.0.2.15", 12000)
         self.server_address =  ('', 10000)
         self.my_clock = 0
         self.my_uuid = uuid.uuid4()
