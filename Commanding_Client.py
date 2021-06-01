@@ -26,6 +26,7 @@ class CommandingClient:
         self.my_lamport_clock = 0
         self.communication_partner = ""
         self.tcp_port = 12000
+        self.ex_dict = {}
 
     # def __bind_socket(self):
     #     self.socket.bind((self.client_address, self.port_address))
@@ -59,10 +60,10 @@ class CommandingClient:
             self.__create_multicast_socket()
             self.__get_server()
             return
-        print("received data: ", data.decode())
         data = in_filter(data.decode(), addr)
-        self.ex_dict = json.loads(data[7])
-        self.communication_partner = addr
+        if data[2] == "ec_list_query_ack":
+            self.ex_dict = json.loads(data[7])
+            self.communication_partner = addr
 
     def __get_tcp_port(self):
         msg = create_frame(priority=2, role="CC", message_type="tcp_port_request", msg_uuid=uuid.uuid4(),
@@ -80,9 +81,12 @@ class CommandingClient:
             self.__create_multicast_socket()
             self.__get_server()
             return
-        print("received data: ", data.decode())
         data_frame = in_filter(data.decode(), addr)
-        self.tcp_port = int(data_frame[7])
+        if data_frame[2]=="tcp_port_request_ack":
+            self.tcp_port = int(data_frame[7])
+        elif data[2] == "ec_list_query_ack":
+            self.ex_dict = json.loads(data[7])
+            self.communication_partner = addr
 
     def __send_state_change_request(self, ex_uuid, state):
         state_change_msg_id = uuid.uuid4()

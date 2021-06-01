@@ -14,6 +14,7 @@ class MessageType(Enum):
     state_change_request = 3
     state_change_ack = 4
     election = 5
+    election_ack = 6
     leader_msg = 6
     replication = 7
     replication_ack = 8
