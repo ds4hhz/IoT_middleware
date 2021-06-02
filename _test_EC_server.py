@@ -63,7 +63,6 @@ class Server:
                 print("time out! No response!")
                 print("try again!")
                 self.discovery_counter -= 1
-
                 if self.discovery_counter <= 0 and len(self.group_member_list) == 1:
                     self.is_leader = True  # lonely group member
                     return
@@ -76,16 +75,21 @@ class Server:
             print("received data: ", data.decode())
             data_frame = in_filter(data.decode(), addr)
             if data_frame[2] == "group_discovery_ack" and not data_frame[7] in self.group_member_list:
-                self.group_member_list.append(data_frame[7])
+                payload_list = data_frame[7].split("/")
+                self.group_member_list.append(payload_list[0])
                 # sorted(self.group_member_list, reverse=True)  # absteigende Sortierung
                 self.group_member_list.sort(reverse=True)
                 print("group members: ", self.group_member_list)
+                temp_dict = json.loads(payload_list[1])
+                if len(temp_dict) != 0:
+                    for k, v in temp_dict.items():
+                        self.ec_dict[k] = v
                 # self.udp_socket.close()
 
     def __group_discovery_ack(self, address):
         msg = create_frame(priority=2, role="S", message_type="group_discovery_ack", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-                           payload=str(self.my_uuid))
+                           payload="{}/{}".format(self.my_uuid, json.dumps(self.ec_dict)))
         self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
@@ -96,97 +100,9 @@ class Server:
         self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
-    # def __get_bigger_ids(self):
-    #     return self.group_member_list[:self.group_member_list.index(str(self.my_uuid))]
-    #
-    # def __send_list_as_str(self, message_list):
-    #     return (','.join([str(x) for x in message_list]))
-
-    # def __election(self):
-    #     self.running_election = True
-    #     print("Node: ", self.my_uuid)
-    #     print("starts election!")
-    #     bigger_members = self.__get_bigger_ids()
-    #     if len(bigger_members) == 0:
-    #         self.is_leader = True
-    #         print("Node: ", self.my_uuid)
-    #         print("I'm the leader!")
-    #         return
-    #     msg = create_frame(priority=1, role="S", message_type="election", msg_uuid=uuid.uuid4(),
-    #                        ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-    #                        payload=self.__send_list_as_str(bigger_members)).encode()
-    #     self.udp_socket.sendto(msg, (self.multicast_group, self.multicast_port))
-    #     self.my_clock += 1
-    #     for member in range(len(bigger_members)):
-    #         try:
-    #             data, addr = self.udp_socket.recvfrom(2048)
-    #         except socket.timeout:
-    #             print("time out! No response!")
-    #             print("try again!")
-    #             self.election_counter += 1
-    #             self.udp_socket.close()
-    #             if self.election_counter >= 2:
-    #                 self.is_leader = True  # bigger member don't react
-    #                 return
-    #             self.__create_multicast_socket_member_discovery()
-    #             self.__election()
-    #             return
-    #         print("received data in election: ", data.decode())
-    #         data_frame = in_filter(data.decode(), addr)
-    #         if data_frame[2] == "election_ack" and data_frame[4] in bigger_members:
-    #             print("Node: ", self.my_uuid)
-    #             print("I'm not the leader!")
-    #             self.is_leader = False
-    #             return
-    #         else:
-    #             continue
-    #     self.election_counter = 0  # reset counter for next election
-    #
-    # def __send_election_ack(self):
-    #     msg = create_frame(priority=1, role="S", message_type="election_ack", msg_uuid=uuid.uuid4(),
-    #                        ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-    #                        payload="I'm alive!")
-    #     self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-    #     self.my_clock += 1
-
-    # def __send_leader_message(self):
-    #     msg = create_frame(priority=1, role="S", message_type="leader_msg", msg_uuid=uuid.uuid4(),
-    #                        ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-    #                        payload="I'm the leader!")
-    #     try:
-    #         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-    #     except:
-    #         self.__create_multicast_socket_member_discovery()
-    #         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-    #     self.my_clock += 1
-    #     copy_of_members = self.group_member_list.copy()
-    #     for member in range(len(self.group_member_list)):
-    #         data, address = self.multi_sock.recvfrom(2048)
-    #         data_frame = in_filter(data.decode(), address)
-    #         if data_frame[4] in copy_of_members:
-    #             copy_of_members.pop(copy_of_members.index(data_frame[4]))
-    #     if len(copy_of_members) == 0:
-    #         print("all members know the leader!")
-    #         self.running_election = False
-    #     elif self.leader_message_counter <= 2:
-    #         self.leader_message_counter += 1
-    #         self.__send_leader_message()
-    #         return
-    #     else:
-    #         print("The nodes {} are not reachable!".format(copy_of_members))
-    #         self.running_election = False
-    #         return
-
-    # def __send_leader_message_ack(self, address):
-    #     msg = create_frame(1, "S", "leader_msg_ack ", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
-    #                        "You are the leader")
-    #     self.multi_sock.sendto(msg.encode(), address)
-    #     self.my_clock += 1
-
     def __create_multicast_socket(self):
         # Create the socket
         self.multi_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
         # Tell the operating system to add the socket to the multicast group
         # on all interfaces.
         self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -216,14 +132,8 @@ class Server:
             # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
-        elif data_frame[2] == "tcp_port_request":  # send tcp socket port
+        elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
             self.__send_tcp_port(address)
-        # elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
-        #     self.leader_address = data_frame[8]
-        #     print("Node: {} accepts node: {} as leader!".format(self.my_uuid, data_frame[4]))
-        #     self.__send_leader_message_ack(address)
-        #     self.is_leader = False
-        #     self.running_election = False
         elif data_frame[2] == "election":
             self.running_election = True
             self.is_leader = False
@@ -394,38 +304,25 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.election_obj.run_election()
         # ToDo: start election -> need members
-        # tcp_thread.start()
-        # heartbeat_thread.start()
+        tcp_thread.start()
+        heartbeat_thread.start()
         while True:  # main thread for election and replication
             print("leader: ", self.is_leader)
             time.sleep(1)
             if not self.running_election:
                 if not secondary_thread.is_alive() and not self.is_leader:
-                    # secondary_thread.start()
+                    secondary_thread.start()
                     pass
             else:
                 if secondary_thread.is_alive():
                     secondary_thread.join()
                     pass
 
-        # self.replication_obj = Replication(self.my_uuid, self.group_member_list)
-        # if self.is_leader:
-        #     print("group members: ", self.group_member_list)
-        #     self.replication_obj.create_multicast_sender()
-        # else:
-        #     # self.udp_socket.close()
-        #     pass
-        # # replication
-        # if not self.is_leader:
-        #     print("Node {} starts secondary thread!".format(self.my_uuid))
-        #     secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
-        #     secondary_thread.start()
-
 
 # server = Server()
 server1 = Server(("", 12000))
 server2 = Server(("", 12001))
-server3 = Server(("", 12008))
+server3 = Server(("", 12003))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
