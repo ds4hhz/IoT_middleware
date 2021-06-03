@@ -93,7 +93,7 @@ class Server:
         self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
-    def __send_tcp_port(self, address):
+    def __send_tcp_port(self, address):  # to CC
         msg = create_frame(priority=2, role="S", message_type="tcp_port_request_ack", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
                            payload=self.tcp_addr[1])
@@ -134,6 +134,7 @@ class Server:
             self.__group_discovery_ack(address)
         elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
             self.__send_tcp_port(address)
+        # election messages
         elif data_frame[2] == "election":
             self.running_election = True
             self.is_leader = False
@@ -146,7 +147,20 @@ class Server:
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
             self.is_leader = True
+        # heartbeat messages
+        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "EC":
+            self.__send_heartbeat_ack(address)
+            temp_dict = json.loads(data_frame[7])
+            for k, v in temp_dict.items():
+                self.ec_dict[k] = v
+            self.__dynamic_discovery_ack(data_frame, address)
         return data_frame, address
+
+    def __send_heartbeat_ack(self,address):
+        msg = create_frame(1, "S", "heartbeat_ack ", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
+                           "heartbeat received!")
+        self.multi_sock.sendto(msg.encode(), address)
+        self.my_clock += 1
 
     def __send_leader_message_ack(self, address):
         msg = create_frame(1, "S", "leader_msg_ack ", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
@@ -167,7 +181,7 @@ class Server:
         self.my_clock += 1
 
     def __open_tcp_socket(self):
-        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
+        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client for CC connection
         self.tcp_socket.bind(self.tcp_addr)
         self.tcp_socket.listen(1)  # allows 1 CCs
         CC_conn, CC_addr = self.tcp_socket.accept()
@@ -295,7 +309,7 @@ class Server:
 
     def run_all(self, server):
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
-        udp_thread = Thread(target=server.run_dynamic_discovery, name="tcp-thread")
+        udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
         heartbeat_thread = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread")
         secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()

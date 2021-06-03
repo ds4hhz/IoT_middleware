@@ -1,3 +1,5 @@
+from threading import Thread
+
 from configurations import cfg
 import logging
 import socket
@@ -11,6 +13,7 @@ import struct
 import sys
 import json
 import time
+import sched
 
 
 class ExecutingClient:
@@ -26,41 +29,46 @@ class ExecutingClient:
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
         self.my_lamport_clock = 0
-        self.communication_partner = ""
+        self.communication_partner = ""  # Not in use
+
+        #heartbeat on server
+        # heartbeat
+        self.heartbeat_period = 3
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
 
     def __bind_socket(self):
-        print("open TCP socket: ",(self.client_address,self.client_port))
+        print("open TCP socket: ", (self.client_address, self.client_port))
         self.socket.bind((self.client_address, self.client_port))
         self.socket.listen(1)
         conn, addr = self.socket.accept()
         return conn, addr
 
-    def receive_message(self):
-        data, address = self.socket.recvfrom(2048)
-        self.holdback_queue.append(in_filter(data.decode(), address))
-
-    def get_server(self):
-        print("open UDP multicast socket")
-        udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        udp_socket.settimeout(3)
+    def __create_udp_socket(self):
+        self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.udp_socket.settimeout(3)
         # Set the time-to-live for messages to 1 so they do not go past the
         # local network segment.
         ttl = struct.pack('b', 1)
-        udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
-        ec_json = {str(self.uuid): [self.state, self.client_address, self.client_port]}
+        self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
-        msg = create_frame(priority=2, role="EC", message_type="dynamic_discovery", msg_uuid=uuid.uuid4(),
-                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
-                           payload=json.dumps(ec_json))
-        print("send to multicast_group the msg: ", msg)
-        udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+    def __state_message(self, message_type: str):
+        ec_json = {str(self.uuid): [self.state, self.client_address, self.client_port]}
+        return create_frame(priority=2, role="EC", message_type=message_type, msg_uuid=uuid.uuid4(),
+                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                            payload=json.dumps(ec_json))
+
+    def get_server(self):
+        msg = self.__state_message("dynamic_discovery")
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
-            data, addr = udp_socket.recvfrom(2048)
+            data, addr = self.udp_socket.recvfrom(2048)
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
-            udp_socket.close()
+            self.udp_socket.close()
+            self.__create_udp_socket()
             self.get_server()
             return
         print("received data from Server: ", data.decode())
@@ -81,6 +89,25 @@ class ExecutingClient:
         connection.send(msg.encode())
         self.my_lamport_clock += 1
 
+    def __send_heartbeat(self):
+        msg = self.__state_message("heartbeat")
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        self.my_lamport_clock += 1
+        try:
+            data, addr = self.udp_socket.recvfrom(2048)
+        except socket.timeout:
+            print("No leading server reachable!")
+            print("try again!")
+            self.udp_socket.close()
+            time.sleep(3)
+            self.__create_udp_socket()
+            self.__send_heartbeat()
+            return
+        if addr != self.communication_partner:
+            print("leading server has changed!")
+            self.communication_partner = addr
+        self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
+
     def __check_state(self):
         if self.state == "off":
             self.__off()
@@ -100,9 +127,15 @@ class ExecutingClient:
     def __blinking(self):
         print("client {} is blinking".format(self.uuid))
 
+    def run_heartbeat_S(self):
+        self.scheduler.run()
+
     def run(self):
+        heartbeat_thread = Thread(target=self.run_heartbeat_S, name="heartbeat_thread")
+        self.__create_udp_socket()
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
         connection, addr = self.__bind_socket()  # tcp socket to Server
+        heartbeat_thread.start()
         while (True):
             data = connection.recvfrom(self.buffer_size)
             if (len(data[0]) == 0):
@@ -119,12 +152,8 @@ class ExecutingClient:
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
                     # state wird so erwartet: [blinking]
                     self.__send_ack(connection=connection, msg_uuid=data_frame[3])
-                elif(data_frame[2]=="heartbeat"):
-                    ec_json = {str(self.uuid): [self.state, self.client_address, self.client_port]}
-                    msg = create_frame(priority=2, role="EC", message_type="dynamic_discovery", msg_uuid=uuid.uuid4(),
-                                       ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
-                                       payload=json.dumps(ec_json))
-                    print("send to multicast_group the msg: ", msg)
+                elif (data_frame[2] == "heartbeat"):
+                    msg = self.__state_message("dynamic_discovery")
                     connection.send(msg.encode())
                     self.my_lamport_clock += 1
             self.__check_state()
