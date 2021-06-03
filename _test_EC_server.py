@@ -39,10 +39,18 @@ class Server:
         self.election_counter = 0
         self.leader_message_counter = 0
 
-        # heartbeat
-        self.heartbeat_period = 10
-        self.scheduler = sched.scheduler(time.time, time.sleep)
-        self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
+        # heartbeat ECs
+        self.heartbeat_period_ec = 10
+        self.scheduler_ec = sched.scheduler(time.time, time.sleep)
+        self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
+
+        # heartbeat leading Server
+        self.heartbeat_period_server = 1
+        self.scheduler_s = sched.scheduler(time.time, time.sleep)
+        self.scheduler_s.enter(self.heartbeat_period_server, 1, self.__send_heartbeat_message_s)
+        self.leading_server_address = ""
+        self.server_heartbeat_fail_counter = 0
+        self.thread_list = []
 
     def __create_multicast_socket_member_discovery(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -65,6 +73,7 @@ class Server:
                 self.discovery_counter -= 1
                 if self.discovery_counter <= 0 and len(self.group_member_list) == 1:
                     self.is_leader = True  # lonely group member
+                    self.running_election = False
                     return
                 elif self.discovery_counter <= 0:
                     break
@@ -79,26 +88,44 @@ class Server:
                 self.group_member_list.append(payload_list[0])
                 # sorted(self.group_member_list, reverse=True)  # absteigende Sortierung
                 self.group_member_list.sort(reverse=True)
-                print("group members: ", self.group_member_list)
                 temp_dict = json.loads(payload_list[1])
                 if len(temp_dict) != 0:
                     for k, v in temp_dict.items():
                         self.ec_dict[k] = v
                 # self.udp_socket.close()
 
-    def __group_discovery_ack(self, address):
-        msg = create_frame(priority=2, role="S", message_type="group_discovery_ack", msg_uuid=uuid.uuid4(),
+    def __send_heartbeat_message_s(self):
+        msg = create_frame(priority=2, role="S", message_type="heartbeat", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-                           payload="{}/{}".format(self.my_uuid, json.dumps(self.ec_dict)))
-        self.multi_sock.sendto(msg.encode(), address)
+                           payload="Are you alive?")
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_clock += 1
-
-    def __send_tcp_port(self, address):  # to CC
-        msg = create_frame(priority=2, role="S", message_type="tcp_port_request_ack", msg_uuid=uuid.uuid4(),
-                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
-                           payload=self.tcp_addr[1])
-        self.multi_sock.sendto(msg.encode(), address)
-        self.my_clock += 1
+        print("send server heartbeat message")
+        try:
+            data, addr = self.udp_socket.recvfrom(2048)
+        except socket.timeout:
+            print("Primary not reachable!!")
+            self.server_heartbeat_fail_counter += 1
+            if self.server_heartbeat_fail_counter >= 3:
+                print("start new election!")
+                self.server_heartbeat_fail_counter = 0
+                self.udp_socket.close()
+                self.group_member_list.clear()
+                self.run_member_discovery()
+                self.election_obj = Election(self.my_uuid, self.group_member_list)
+                self.election_obj.run_election()
+                self.thread_list[-1].join()
+                return
+            print("try again!")
+            self.udp_socket.close()
+            time.sleep(3)
+            self.__create_multicast_socket_member_discovery()
+            self.__send_heartbeat_message_s()
+            return
+        if addr != self.leading_server_address:
+            print("leading server has changed!")
+            self.leading_server_address = addr
+        self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__send_heartbeat_message_s)
 
     def __create_multicast_socket(self):
         # Create the socket
@@ -115,7 +142,6 @@ class Server:
 
     def __dynamic_discovery(self):  # messages over multicast group
         data, address = self.multi_sock.recvfrom(2048)
-        print("data over multicast_group: ", data)
         data_frame = in_filter(data.decode(), address)
         if data_frame[1] == "CC" and data_frame[2] == "ec_list_query" and self.is_leader:
             # send dict of all known executing clients with state
@@ -139,14 +165,17 @@ class Server:
             self.running_election = True
             self.is_leader = False
             self.__send_election_ack(address)
-        elif data_frame[2] == "leader_msg" and not data_frame[4] == str(self.my_uuid):
+        elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
             self.__send_leader_message_ack(address)
+            self.leading_server_address = address
             print("leader message received")
             self.is_leader = False
+            self.running_election = False
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
             self.is_leader = True
+            self.running_election = False
         # heartbeat messages
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "EC":
             self.__send_heartbeat_ack(address)
@@ -154,11 +183,21 @@ class Server:
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
             self.__dynamic_discovery_ack(data_frame, address)
+        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
+            self.__send_heartbeat_ack(address)
+            print("server heartbeat message received")
         return data_frame, address
 
-    def __send_heartbeat_ack(self,address):
+    def __send_heartbeat_ack(self, address):
         msg = create_frame(1, "S", "heartbeat_ack ", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
                            "heartbeat received!")
+        self.multi_sock.sendto(msg.encode(), address)
+        self.my_clock += 1
+
+    def __group_discovery_ack(self, address):
+        msg = create_frame(priority=2, role="S", message_type="group_discovery_ack", msg_uuid=uuid.uuid4(),
+                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
+                           payload="{}/{}".format(self.my_uuid, json.dumps(self.ec_dict)))
         self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
@@ -178,6 +217,13 @@ class Server:
         msg = create_frame(1, "S", "dynamic_discovery_ack ", data_frame[3], self.my_uuid, 1, self.my_clock, "runs")
         self.multi_sock.sendto(msg.encode(), address)
         print("dynamic discovery ack msg: ", msg)
+        self.my_clock += 1
+
+    def __send_tcp_port(self, address):  # to CC
+        msg = create_frame(priority=2, role="S", message_type="tcp_port_request_ack", msg_uuid=uuid.uuid4(),
+                           ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.my_clock,
+                           payload=self.tcp_addr[1])
+        self.multi_sock.sendto(msg.encode(), address)
         self.my_clock += 1
 
     def __open_tcp_socket(self):
@@ -259,7 +305,7 @@ class Server:
         print("EC_dict updated")
         print("EC_dict: ", self.ec_dict)
         # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-        self.scheduler.enter(self.heartbeat_period, 1, self.__check_EC_state)
+        self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
@@ -294,7 +340,12 @@ class Server:
                 # self.__open_tcp_socket()
 
     def run_heartbeat_EC(self):
-        self.scheduler.run()
+        self.scheduler_ec.run()
+
+    def run_heartbeat_s(self):
+        self.scheduler_s.run()
+        while True:
+            pass
 
     def run_member_discovery(self):
         self.__create_multicast_socket_member_discovery()
@@ -310,27 +361,35 @@ class Server:
     def run_all(self, server):
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
-        heartbeat_thread = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread")
-        secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
+        heartbeat_thread_EC = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread_EC")
+        self.thread_list.append(Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s"))
+        # secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()
         self.run_member_discovery()
         self.election_obj = Election(self.my_uuid, self.group_member_list)
-        self.replication_obj = Replication(self.my_uuid, self.group_member_list)
+        # self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.election_obj.run_election()
         # ToDo: start election -> need members
         tcp_thread.start()
-        heartbeat_thread.start()
+        heartbeat_thread_EC.start()
         while True:  # main thread for election and replication
             print("leader: ", self.is_leader)
             time.sleep(1)
             if not self.running_election:
-                if not secondary_thread.is_alive() and not self.is_leader:
-                    secondary_thread.start()
-                    pass
+                # if not secondary_thread.is_alive() and not self.is_leader:
+                #     secondary_thread.start()
+                if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
+                    self.thread_list.append(Thread(target=self.run_heartbeat_s,
+                                                     name="heartbeat_thread_s{}".format(len(self.thread_list))))
+                    try:
+                        self.thread_list[-1].start()
+                    except RuntimeError as e:
+                        print(e)
             else:
-                if secondary_thread.is_alive():
-                    secondary_thread.join()
-                    pass
+                # if secondary_thread.is_alive():
+                #     secondary_thread.join()
+                if self.thread_list[-1].is_alive():
+                    self.thread_list[-1].join()
 
 
 # server = Server()
