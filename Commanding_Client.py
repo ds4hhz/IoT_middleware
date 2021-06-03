@@ -1,3 +1,5 @@
+from threading import Thread
+
 from configurations import cfg
 import logging
 import socket
@@ -10,6 +12,7 @@ import uuid
 import struct
 import time
 import json
+import sched
 
 
 class CommandingClient:
@@ -28,15 +31,11 @@ class CommandingClient:
         self.tcp_port = 12000
         self.ex_dict = {}
 
-    # def __bind_socket(self):
-    #     self.socket.bind((self.client_address, self.port_address))
-    #     self.socket.listen(1)
-    #     conn, addr = self.socket.accept()
-    #     return conn, addr
-
-    # def receive_message(self):
-    #     data, address = self.socket.recvfrom(2048)
-    #     self.holdback_queue.append(in_filter(data.decode(), address))
+        # heartbeat on server
+        # heartbeat
+        self.heartbeat_period = 3
+        self.scheduler = sched.scheduler(time.time, time.sleep)
+        self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
 
     def __create_multicast_socket(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -48,7 +47,6 @@ class CommandingClient:
         msg = create_frame(priority=2, role="CC", message_type="ec_list_query", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="Send me a list of all executing clients")
-
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
@@ -65,11 +63,34 @@ class CommandingClient:
             self.ex_dict = json.loads(data[7])
             self.communication_partner = addr
 
+    def __send_heartbeat(self):
+        msg = create_frame(priority=2, role="CC", message_type="heartbeat", msg_uuid=uuid.uuid4(),
+                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                            payload="Are you alive?")
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        self.my_lamport_clock += 1
+        try:
+            data, addr = self.udp_socket.recvfrom(2048)
+        except socket.timeout:
+            print("No leading server reachable!")
+            print("try again!")
+            # self.udp_socket.close()
+            # time.sleep(3)
+            # self.__create_multicast_socket()
+            self.__send_heartbeat()
+            return
+        if addr != self.communication_partner:
+            print("leading server has changed!")
+            self.communication_partner = addr
+            self.__get_tcp_port()
+            print("tcp_port: ", self.tcp_port)
+            self.__get_server()  # dictionary mit executing clients
+        self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
+
     def __get_tcp_port(self):
         msg = create_frame(priority=2, role="CC", message_type="tcp_port_request", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="Send me your tcp socket port")
-
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
@@ -82,7 +103,7 @@ class CommandingClient:
             self.__get_server()
             return
         data_frame = in_filter(data.decode(), addr)
-        if data_frame[2]=="tcp_port_request_ack":
+        if data_frame[2] == "tcp_port_request_ack":
             self.tcp_port = int(data_frame[7])
         elif data[2] == "ec_list_query_ack":
             self.ex_dict = json.loads(data[7])
@@ -126,11 +147,16 @@ class CommandingClient:
         connection.send(msg.encode())
         self.my_lamport_clock += 1
 
+    def run_heartbeat_S(self):
+        self.scheduler.run()
+
     def run(self):
+        heartbeat_thread = Thread(target=self.run_heartbeat_S, name="heartbeat_thread")
         self.__create_multicast_socket()
         self.__get_tcp_port()
         print("tcp_port: ", self.tcp_port)
         self.__get_server()  # dictionary mit executing clients
+        heartbeat_thread.start()
         while (True):
             print(self.ex_dict)
             if (len(self.ex_dict) == 0):

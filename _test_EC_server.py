@@ -185,7 +185,8 @@ class Server:
             self.__dynamic_discovery_ack(data_frame, address)
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
             self.__send_heartbeat_ack(address)
-            print("server heartbeat message received")
+        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
+            self.__send_heartbeat_ack(address)
         return data_frame, address
 
     def __send_heartbeat_ack(self, address):
@@ -395,7 +396,7 @@ class Server:
 # server = Server()
 server1 = Server(("", 12000))
 server2 = Server(("", 12001))
-server3 = Server(("", 12003))
+server3 = Server(("", 12004))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))

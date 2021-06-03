@@ -31,7 +31,7 @@ class ExecutingClient:
         self.my_lamport_clock = 0
         self.communication_partner = ""  # Not in use
 
-        #heartbeat on server
+        # heartbeat on server
         # heartbeat
         self.heartbeat_period = 3
         self.scheduler = sched.scheduler(time.time, time.sleep)
@@ -146,7 +146,7 @@ class ExecutingClient:
                 continue
             else:
                 data_frame = in_filter(data[0].decode(), addr)
-                print("received data from TCP connection: ", data_frame)
+                # print("received data from TCP connection: ", data_frame)
                 if (data_frame[2] == "state_change_request"):
                     self.__state_change(
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
