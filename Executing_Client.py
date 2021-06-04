@@ -1,12 +1,8 @@
 from threading import Thread
 
-from configurations import cfg
 import logging
 import socket
-from Messenger import Messenger
 from pipesfilter import create_frame
-from pipesfilter import Role
-from pipesfilter import MessageType
 from pipesfilter import in_filter
 import uuid
 import struct
@@ -137,7 +133,10 @@ class ExecutingClient:
         connection, addr = self.__bind_socket()  # tcp socket to Server
         heartbeat_thread.start()
         while (True):
-            data = connection.recvfrom(self.buffer_size)
+            try:
+                data = connection.recvfrom(self.buffer_size)
+            except:
+                pass    # leading server has died!
             if (len(data[0]) == 0):
                 connection.close()
                 time.sleep(1)

@@ -1,8 +1,7 @@
 import struct
 import socket
 from pipesfilter import create_frame
-from pipesfilter import Role
-from pipesfilter import MessageType
+
 from pipesfilter import in_filter
 import uuid
 import time
@@ -81,6 +80,9 @@ class Server:
                 # self.__create_multicast_socket_member_discovery()
                 self.__get_group_members()
                 return
+            except:
+                self.__create_multicast_socket_member_discovery()
+                continue
             print("received data: ", data.decode())
             data_frame = in_filter(data.decode(), addr)
             if data_frame[2] == "group_discovery_ack" and not data_frame[7] in self.group_member_list:
@@ -114,7 +116,7 @@ class Server:
                 self.run_member_discovery()
                 self.election_obj = Election(self.my_uuid, self.group_member_list)
                 self.election_obj.run_election()
-                self.thread_list[-1].join()
+                # self.thread_list[-1].join()
                 return
             print("try again!")
             self.udp_socket.close()
@@ -171,13 +173,14 @@ class Server:
             print("leader message received")
             self.is_leader = False
             self.running_election = False
-            try:
-                self.thread_list[-1].start()
-            except RuntimeError as e:
-                print(e)
-                self.thread_list.append(Thread(target=self.run_heartbeat_s,
-                                               name="heartbeat_thread_s{}".format(len(self.thread_list))))
-                self.thread_list[-1].start()
+            self.run_heartbeat_s()
+            # try:
+            #     self.thread_list[-1].start()
+            # except RuntimeError as e:
+            #     print(e)
+                # self.thread_list.append(Thread(target=self.run_heartbeat_s,
+                #                                name="heartbeat_thread_s{}".format(len(self.thread_list))))
+                # self.thread_list[-1].start()
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
@@ -287,7 +290,8 @@ class Server:
 
     def __check_EC_state(self):
         del_list = []
-        for key, item in self.ec_dict.items():
+        copy_ec_dict = self.ec_dict.copy()
+        for key, item in copy_ec_dict.items():
             addr_tuple = (item[1], item[2])
             ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
@@ -325,7 +329,6 @@ class Server:
         while (True):
             data_frame, address = self.__dynamic_discovery()
             # self.__dynamic_discovery_ack(data_frame, address)
-            print("ec_dict in udp thread: ", self.ec_dict)
 
     def run_tcp_socket(self):
         self.__open_tcp_socket()  # socket for CC communication
@@ -385,15 +388,16 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
-        if not self.is_leader:
-            self.thread_list[-1].start()
+        # if not self.is_leader:
+        #     self.thread_list[-1].start()
         heartbeat_thread_EC.start()
+        tcp_thread.start()
         while True:  # main thread for election and replication
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
             time.sleep(1)
             if not self.running_election:
-                if not secondary_thread.is_alive() and not self.is_leader:
-                    tcp_thread.start()
+                # if not secondary_thread.is_alive() and not self.is_leader:
+                #     tcp_thread.start()
                 if not secondary_thread.is_alive() and not self.is_leader:
                     secondary_thread.start()
                 # if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
@@ -413,7 +417,7 @@ class Server:
 # server = Server()
 server1 = Server(("", 12000))
 server2 = Server(("", 12001))
-server3 = Server(("", 12006))
+server3 = Server(("", 12003))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))

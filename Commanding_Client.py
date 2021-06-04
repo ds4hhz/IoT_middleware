@@ -1,11 +1,7 @@
 from threading import Thread
 
-from configurations import cfg
-import logging
 import socket
-from Messenger import Messenger
 from pipesfilter import create_frame
-from pipesfilter import Role
 from pipesfilter import MessageType
 from pipesfilter import in_filter
 import uuid
@@ -65,8 +61,8 @@ class CommandingClient:
 
     def __send_heartbeat(self):
         msg = create_frame(priority=2, role="CC", message_type="heartbeat", msg_uuid=uuid.uuid4(),
-                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
-                            payload="Are you alive?")
+                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                           payload="Are you alive?")
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
@@ -75,7 +71,7 @@ class CommandingClient:
             print("No leading server reachable!")
             print("try again!")
             # self.udp_socket.close()
-            # time.sleep(3)
+            time.sleep(1)
             # self.__create_multicast_socket()
             self.__send_heartbeat()
             return
@@ -139,10 +135,10 @@ class CommandingClient:
                 print("wrong message, wait for state_change_ack")
 
     def __send_ack(self, connection):
-        msg = create_frame(priority=2, role="EC", message_type=MessageType.state_change_ack, msg_uuid=uuid.uuid4(),
+        msg = create_frame(priority=2, role="EC", message_type="state_change_ack", msg_uuid=uuid.uuid4(),
                            ppid=self.uuid, fairness_assertion=1,
                            sender_clock=self.my_lamport_clock, payload="state change to: {}".format(
-                self.state).encode())  # ToDo: msg_uuid bei ack gleiche wie bei Ursprungsnachricht?
+                self.state).encode())
         # self.socket.sendto(msg.encode(), address)
         connection.send(msg.encode())
         self.my_lamport_clock += 1
