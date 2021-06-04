@@ -77,8 +77,8 @@ class Server:
                     return
                 elif self.discovery_counter <= 0:
                     break
-                self.udp_socket.close()
-                self.__create_multicast_socket_member_discovery()
+                # self.udp_socket.close()
+                # self.__create_multicast_socket_member_discovery()
                 self.__get_group_members()
                 return
             print("received data: ", data.decode())
@@ -155,7 +155,7 @@ class Server:
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
             self.__dynamic_discovery_ack(data_frame, address)
-            # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+            self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
         elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
@@ -305,7 +305,7 @@ class Server:
             del self.ec_dict[key]
         print("EC_dict updated")
         print("EC_dict: ", self.ec_dict)
-        # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+        self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
@@ -355,40 +355,48 @@ class Server:
         self.group_member_list = list(dict.fromkeys(self.group_member_list))
 
     def run_secondary(self):
-        self.replication_obj.create_multicast_receiver()
+        # self.replication_obj.create_multicast_sender()
         while True:
-            self.ec_dict = self.replication_obj.get_replication_message()
+            print("return of rep msg: {}".format(self.replication_obj.get_replication_message()))
+            temp_dict_str = self.replication_obj.get_replication_message()
+            temp_dict = json.loads(temp_dict_str)
+            if len(temp_dict) != 0:
+                for k, v in temp_dict.items():
+                    self.ec_dict[k] = v
+            print("tmp dict: ", temp_dict)
+            print("ec_dict in secondary: ", self.ec_dict)
 
     def run_all(self, server):
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
         heartbeat_thread_EC = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread_EC")
         self.thread_list.append(Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s"))
-        # secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
+        secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()
         self.run_member_discovery()
         self.election_obj = Election(self.my_uuid, self.group_member_list)
-        # self.replication_obj = Replication(self.my_uuid, self.group_member_list)
+        self.replication_obj = Replication(self.my_uuid, self.group_member_list)
+        self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
-        # ToDo: start election -> need members
-        tcp_thread.start()
         heartbeat_thread_EC.start()
         while True:  # main thread for election and replication
             print("leader: ", self.is_leader)
             time.sleep(1)
             if not self.running_election:
-                # if not secondary_thread.is_alive() and not self.is_leader:
-                #     secondary_thread.start()
+                if not secondary_thread.is_alive() and not self.is_leader:
+                    tcp_thread.start()
+                if not secondary_thread.is_alive() and not self.is_leader:
+                    secondary_thread.start()
                 if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
                     self.thread_list.append(Thread(target=self.run_heartbeat_s,
-                                                     name="heartbeat_thread_s{}".format(len(self.thread_list))))
+                                                   name="heartbeat_thread_s{}".format(len(self.thread_list))))
                     try:
                         self.thread_list[-1].start()
                     except RuntimeError as e:
                         print(e)
             else:
-                # if secondary_thread.is_alive():
-                #     secondary_thread.join()
+                if secondary_thread.is_alive():
+                    secondary_thread.join()
                 if self.thread_list[-1].is_alive():
                     self.thread_list[-1].join()
 

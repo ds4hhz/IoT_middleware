@@ -17,7 +17,7 @@ class Replication:
         self.members = members
 
         self.replication_message_counter = 0
-        self.ec_dict={}
+        self.ec_dict = {}
 
     def create_multicast_sender(self):
         # Create the socket
@@ -31,14 +31,14 @@ class Replication:
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    def create_multicast_receiver(self):
-        # Create the socket
-        self.multi_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Bind to the server address
-        self.multi_sock.bind(self.server_address)
-        group = socket.inet_aton(self.multicast_group)
-        mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-        self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    # def create_multicast_receiver(self):
+    #     # Create the socket
+    #     self.multi_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    #     # Bind to the server address
+    #     self.multi_sock.bind(self.server_address)
+    #     group = socket.inet_aton(self.multicast_group)
+    #     mreq = struct.pack('4sL', group, socket.INADDR_ANY)
+    #     self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     def send_replication_message(self, ec_dict_str: str):  # only in use from primary
         msg = create_frame(priority=0, role="S", message_type="replication", msg_uuid=uuid.uuid4(),
@@ -72,7 +72,6 @@ class Replication:
 
     def get_replication_message(self):  # only used from secondary
         data, address = self.multi_sock.recvfrom(self.max_response_size)
-        print("data over multicast_group: ", data)
         data_frame = in_filter(data.decode(), address)
         if data_frame[2] == "replication" and data_frame[4] != self.my_uuid:
             self.__send_replication_message_ack()
@@ -80,4 +79,6 @@ class Replication:
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
-            return self.ec_dict
+            print("ec dict in rep msg: ", self.ec_dict)
+            return json.dumps(self.ec_dict)
+        return "{}"
