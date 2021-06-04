@@ -171,6 +171,13 @@ class Server:
             print("leader message received")
             self.is_leader = False
             self.running_election = False
+            try:
+                self.thread_list[-1].start()
+            except RuntimeError as e:
+                print(e)
+                self.thread_list.append(Thread(target=self.run_heartbeat_s,
+                                               name="heartbeat_thread_s{}".format(len(self.thread_list))))
+                self.thread_list[-1].start()
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
@@ -345,8 +352,8 @@ class Server:
 
     def run_heartbeat_s(self):
         self.scheduler_s.run()
-        while True:
-            pass
+        # while True:
+        #     pass
 
     def run_member_discovery(self):
         self.__create_multicast_socket_member_discovery()
@@ -378,6 +385,8 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
+        if not self.is_leader:
+            self.thread_list[-1].start()
         heartbeat_thread_EC.start()
         while True:  # main thread for election and replication
             print("leader: ", self.is_leader)
@@ -387,24 +396,24 @@ class Server:
                     tcp_thread.start()
                 if not secondary_thread.is_alive() and not self.is_leader:
                     secondary_thread.start()
-                if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
-                    self.thread_list.append(Thread(target=self.run_heartbeat_s,
-                                                   name="heartbeat_thread_s{}".format(len(self.thread_list))))
-                    try:
-                        self.thread_list[-1].start()
-                    except RuntimeError as e:
-                        print(e)
+                # if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
+                #     self.thread_list.append(Thread(target=self.run_heartbeat_s,
+                #                                    name="heartbeat_thread_s{}".format(len(self.thread_list))))
+                #     try:
+                #         self.thread_list[-1].start()
+                #     except RuntimeError as e:
+                #         print(e)
             else:
                 if secondary_thread.is_alive():
                     secondary_thread.join()
-                if self.thread_list[-1].is_alive():
-                    self.thread_list[-1].join()
+                # if self.thread_list[-1].is_alive():
+                #     self.thread_list[-1].join()
 
 
 # server = Server()
 server1 = Server(("", 12000))
 server2 = Server(("", 12001))
-server3 = Server(("", 12004))
+server3 = Server(("", 12003))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
