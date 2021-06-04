@@ -61,6 +61,7 @@ class Election:
             self.__send_leader_message()
             print("Node: ", self.my_uuid)
             print("I'm the leader!")
+            self.election_counter = 0  # reset counter for next election
             return
         msg = create_frame(priority=1, role="S", message_type="election", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.election_clock,
@@ -74,11 +75,15 @@ class Election:
                 print("time out! No response!")
                 print("try again!")
                 self.election_counter += 1
-                self.multi_sock.close()
+                # self.multi_sock.close()
                 if self.election_counter >= 2:
                     self.is_leader = True  # bigger member don't react
+                    self.__send_leader_message()
+                    print("Node: ", self.my_uuid)
+                    print("I'm the leader!")
+                    self.election_counter = 0  # reset counter for next election
                     return
-                self.create_multicast_sender()
+                # self.create_multicast_sender()
                 self.election()
                 return
             print("received data in election: ", data.decode())
@@ -88,7 +93,14 @@ class Election:
                 print("I'm not the leader!")
                 self.is_leader = False
                 return
-            else:
+            elif data_frame[2] == "election_ack" and data_frame[4] < str(self.my_uuid):
+                self.is_leader = True
+                self.__send_leader_message()
+                print("Node: ", self.my_uuid)
+                print("I'm the leader!")
+                self.election_counter = 0  # reset counter for next election
+                return
+            else: #ToDo: wtf??
                 continue
         self.election_counter = 0  # reset counter for next election
 
@@ -159,7 +171,6 @@ class Election:
                     self.__send_election_ack(address)  # election starter is not leader!
                     self.election()  # starts election with bigger members
 
-    # ToDo: send message to multicast group dynamic discovery, that election is started
     def send_election_start_message(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(3)

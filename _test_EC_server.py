@@ -389,7 +389,7 @@ class Server:
             self.thread_list[-1].start()
         heartbeat_thread_EC.start()
         while True:  # main thread for election and replication
-            print("leader: ", self.is_leader)
+            print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
             time.sleep(1)
             if not self.running_election:
                 if not secondary_thread.is_alive() and not self.is_leader:
@@ -413,7 +413,7 @@ class Server:
 # server = Server()
 server1 = Server(("", 12000))
 server2 = Server(("", 12001))
-server3 = Server(("", 12003))
+server3 = Server(("", 12006))
 # server.run_all()
 server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
 server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
