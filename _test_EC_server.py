@@ -220,7 +220,6 @@ class Server:
     def __dynamic_discovery_ack(self, data_frame, address):
         msg = create_frame(1, "S", "dynamic_discovery_ack ", data_frame[3], self.my_uuid, 1, self.my_clock, "runs")
         self.multi_sock.sendto(msg.encode(), address)
-        print("dynamic discovery ack msg: ", msg)
         self.my_clock += 1
 
     def __send_tcp_port(self, address):  # to CC
@@ -270,7 +269,12 @@ class Server:
         ex_tcp_con.connect(EC_connection)
         ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
                                      payload).encode())
-        data = ex_tcp_con.recv(2048)
+        try:
+            data = ex_tcp_con.recv(2048)
+        except:
+            # try again
+            self.__send_state_change_request_to_EC(message_id,payload,cc_uuid,state_request,EC_connection)
+            return
         print("data from EC tcp connection: ", data)
         if (len(data) != 0):
             print("received data from EC: ", data[0])
@@ -335,7 +339,7 @@ class Server:
                     if (data_received):
                         self.__state_change_ack_to_CC(payload, message_id, state_request)
                     else:
-                        # self.run_tcp_socket()
+                        # self.run_tcp_socket() #ToDo: negative ack
                         continue
                 else:
                     continue
@@ -381,35 +385,17 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
-        # if not self.is_leader:
-        #     self.thread_list[-1].start()
+        if not self.is_leader:
+            secondary_thread.start()
         heartbeat_thread_EC.start()
         tcp_thread.start()
         while True:  # main thread for election and replication
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
-            time.sleep(1)
-            if not self.running_election:
-                # if not secondary_thread.is_alive() and not self.is_leader:
-                #     tcp_thread.start()
-                if not secondary_thread.is_alive() and not self.is_leader:
-                    secondary_thread.start()
-                # if (not self.thread_list[-1].is_alive()) and (not self.is_leader):
-                #     self.thread_list.append(Thread(target=self.run_heartbeat_s,
-                #                                    name="heartbeat_thread_s{}".format(len(self.thread_list))))
-                #     try:
-                #         self.thread_list[-1].start()
-                #     except RuntimeError as e:
-                #         print(e)
-            else:
-                if secondary_thread.is_alive():
-                    secondary_thread.join()
-                # if self.thread_list[-1].is_alive():
-                #     self.thread_list[-1].join()
+            time.sleep(3)
 
 
-print(sys.argv)
 if "-p" in sys.argv:
-    tcp_port = sys.argv[sys.argv.index("-p")+1]
+    tcp_port = sys.argv[sys.argv.index("-p") + 1]
 else:
     tcp_port = 12000
 tcp_address = ("", int(tcp_port))

@@ -105,23 +105,40 @@ class CommandingClient:
             self.ex_dict = json.loads(data[7])
             self.communication_partner = addr
 
+    def __create_tcp_socket(self):
+        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.tcp_socket.settimeout(2)
+        self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
+
     def __send_state_change_request(self, ex_uuid, state):
         state_change_msg_id = uuid.uuid4()
         msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
-        tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        tcp_socket.connect((self.communication_partner[0], self.tcp_port))
+        # tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # tcp_socket.settimeout(2)
+        # tcp_socket.connect((self.communication_partner[0], self.tcp_port))
         # tcp_socket.connect(("127.0.0.1", 12000))
-        tcp_socket.send(msg.encode())
+        self.tcp_socket.send(msg.encode())
         print("length of the message: ", len(msg.encode()))
         print("message id of change state request: ", state_change_msg_id)
         # wait for ack
         while (True):
-            data, add = tcp_socket.recvfrom(2048)
+            try:
+                data, add = self.tcp_socket.recvfrom(2048)
+            except:
+                # reopen tcp connection
+                self.tcp_socket.close()
+                self.__get_tcp_port()
+                self.__get_server()
+                self.__create_tcp_socket()
+                self.__send_state_change_request(ex_uuid, state)
+                return
             if (len(data) == 0):
                 print("connection lost!")
-                tcp_socket.close()
+                self.tcp_socket.close()
+                self.__create_tcp_socket()
+                self.__send_state_change_request(ex_uuid, state)
                 break
             data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
@@ -129,7 +146,7 @@ class CommandingClient:
             if (data_frame[2] == "state_change_ack" and data_frame[3] == str(state_change_msg_id)):
                 self.ex_dict[ex_uuid] = state
                 print("update EC state: ", self.ex_dict)
-                tcp_socket.close()
+                # tcp_socket.close()
                 break
             else:
                 print("wrong message, wait for state_change_ack")
@@ -152,6 +169,7 @@ class CommandingClient:
         self.__get_tcp_port()
         print("tcp_port: ", self.tcp_port)
         self.__get_server()  # dictionary mit executing clients
+        self.__create_tcp_socket()
         heartbeat_thread.start()
         while (True):
             print(self.ex_dict)

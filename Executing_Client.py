@@ -95,7 +95,7 @@ class ExecutingClient:
             print("No leading server reachable!")
             print("try again!")
             self.udp_socket.close()
-            time.sleep(3)
+            time.sleep(1)
             self.__create_udp_socket()
             self.__send_heartbeat()
             return
@@ -136,7 +136,7 @@ class ExecutingClient:
             try:
                 data = connection.recvfrom(self.buffer_size)
             except:
-                pass    # leading server has died!
+                pass    # leading server has died! #ToDo: create new connection to leading server!
             if (len(data[0]) == 0):
                 connection.close()
                 time.sleep(1)
