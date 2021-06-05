@@ -174,13 +174,6 @@ class Server:
             self.is_leader = False
             self.running_election = False
             self.run_heartbeat_s()
-            # try:
-            #     self.thread_list[-1].start()
-            # except RuntimeError as e:
-            #     print(e)
-                # self.thread_list.append(Thread(target=self.run_heartbeat_s,
-                #                                name="heartbeat_thread_s{}".format(len(self.thread_list))))
-                # self.thread_list[-1].start()
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
@@ -414,13 +407,20 @@ class Server:
                 #     self.thread_list[-1].join()
 
 
+print(sys.argv)
+if "-p" in sys.argv:
+    tcp_port = sys.argv[sys.argv.index("-p")+1]
+else:
+    tcp_port = 12000
+tcp_address = ("", int(tcp_port))
+print("tcp socket address: {}".format(tcp_address))
 # server = Server()
-server1 = Server(("", 12000))
-server2 = Server(("", 12001))
-server3 = Server(("", 12003))
+# server1 = Server(("", 12000))
+# server2 = Server(("", 12001))
+server3 = Server(tcp_address)
 # server.run_all()
-server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
-server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
+# server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
+# server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
 # server3_process = multiprocessing.Process(target=server3.run_all, name="server3", args=(server3,))
 #
 # server1_process.start()

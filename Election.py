@@ -30,20 +30,12 @@ class Election:
         # Tell the operating system to add the socket to the multicast group
         # on all interfaces.
         self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.multi_sock.settimeout(2)
         # Bind to the server address
         self.multi_sock.bind(self.server_address)
         group = socket.inet_aton(self.multicast_group)
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
-    def create_multicast_receiver(self):
-        # Create the socket
-        self.multi_sock_rec  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Bind to the server address
-        self.multi_sock_rec.bind(self.server_address)
-        group = socket.inet_aton(self.multicast_group)
-        mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-        self.multi_sock_rec.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
     def __get_bigger_ids(self):
         return self.members[:self.members.index(str(self.my_uuid))]
@@ -151,7 +143,10 @@ class Election:
 
     def __multicast_message_receiver(self):
         while True:
-            data, address = self.multi_sock.recvfrom(2048)
+            try:
+                data, address = self.multi_sock.recvfrom(2048)
+            except:
+                continue
             print("message receiver gets data: ", data)
             data_frame = in_filter(data.decode(), address)
             if data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
