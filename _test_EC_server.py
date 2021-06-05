@@ -49,7 +49,6 @@ class Server:
         self.scheduler_s.enter(self.heartbeat_period_server, 1, self.__send_heartbeat_message_s)
         self.leading_server_address = ""
         self.server_heartbeat_fail_counter = 0
-        self.thread_list = []
 
     def __create_multicast_socket_member_discovery(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -273,7 +272,7 @@ class Server:
             data = ex_tcp_con.recv(2048)
         except:
             # try again
-            self.__send_state_change_request_to_EC(message_id,payload,cc_uuid,state_request,EC_connection)
+            self.__send_state_change_request_to_EC(message_id, payload, cc_uuid, state_request, EC_connection)
             return
         print("data from EC tcp connection: ", data)
         if (len(data) != 0):
@@ -377,7 +376,7 @@ class Server:
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
         heartbeat_thread_EC = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread_EC")
-        self.thread_list.append(Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s"))
+        heartbeat_thread_s = Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s")
         secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()
         self.run_member_discovery()
@@ -385,6 +384,7 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
+        heartbeat_thread_s.start()
         if not self.is_leader:
             secondary_thread.start()
         heartbeat_thread_EC.start()
@@ -392,6 +392,9 @@ class Server:
         while True:  # main thread for election and replication
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
             time.sleep(3)
+            if not self.is_leader:
+                self.run_heartbeat_s()
+
 
 
 if "-p" in sys.argv:
@@ -400,18 +403,6 @@ else:
     tcp_port = 12000
 tcp_address = ("", int(tcp_port))
 print("tcp socket address: {}".format(tcp_address))
-# server = Server()
-# server1 = Server(("", 12000))
-# server2 = Server(("", 12001))
+
 server3 = Server(tcp_address)
-# server.run_all()
-# server1_process = multiprocessing.Process(target=server1.run_all, name="server1", args=(server1,))
-# server2_process = multiprocessing.Process(target=server2.run_all, name="server2", args=(server2,))
-# server3_process = multiprocessing.Process(target=server3.run_all, name="server3", args=(server3,))
-#
-# server1_process.start()
-# time.sleep(5)
-# server2_process.start()
-# time.sleep(5)
-# server3_process.start()
 server3.run_all(server3)
