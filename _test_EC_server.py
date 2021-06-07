@@ -184,7 +184,7 @@ class Server:
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
-            self.__dynamic_discovery_ack(data_frame, address)
+            # self.__dynamic_discovery_ack(data_frame, address)
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
             self.__send_heartbeat_ack(address)
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
