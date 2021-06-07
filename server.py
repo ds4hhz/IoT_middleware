@@ -291,6 +291,7 @@ class Server:
             return False
 
     def __check_EC_state(self):
+        print("send tcp message to EC")
         del_list = []
         copy_ec_dict = self.ec_dict.copy()
         for key, item in copy_ec_dict.items():
