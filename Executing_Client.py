@@ -45,7 +45,7 @@ class ExecutingClient:
         self.socket.bind((self.client_address, self.client_port))
         self.socket.listen(20)  # allows 20 server
         while True:
-            CC_conn, CC_addr = self.tcp_socket.accept()
+            CC_conn, CC_addr = self.socket.accept()
             print("EC accept new server connection!")
             thread = Thread(target=self.__handle_tcp_communication, args=(CC_conn, CC_addr))
             thread.start()
