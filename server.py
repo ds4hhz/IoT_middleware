@@ -231,7 +231,7 @@ class Server:
     def __open_tcp_socket(self):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client for CC connection
         self.tcp_socket.bind(self.tcp_addr)
-        self.tcp_socket.listen(1)  # allows 1 CCs
+        self.tcp_socket.listen(3)  # allows 1 CCs
         CC_conn, CC_addr = self.tcp_socket.accept()
         self.CC_connection_list.append(CC_conn)
         self.CC_address_list.append(CC_addr)
@@ -265,9 +265,15 @@ class Server:
     def __send_state_change_request_to_EC(self, message_id, payload, cc_uuid, state_request, EC_connection: tuple):
         ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # ex_tcp_con.connect(('127.0.0.1', 11000))
-        ex_tcp_con.connect(EC_connection)
-        ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
+        try:
+            ex_tcp_con.connect(EC_connection)
+            ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
                                      payload).encode())
+        except:
+            print("lost connection to EC")
+            ex_tcp_con.connect(EC_connection)
+            ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
+                                         payload).encode())
         try:
             data = ex_tcp_con.recv(2048)
         except:

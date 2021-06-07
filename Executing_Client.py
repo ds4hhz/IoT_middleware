@@ -13,7 +13,7 @@ import sched
 
 
 class ExecutingClient:
-    def __init__(self, address='127.0.0.1', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
+    def __init__(self, address='', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
                  multicast_port=10000):
         self.client_address = address
         self.client_port = port
@@ -94,9 +94,9 @@ class ExecutingClient:
         except socket.timeout:
             print("No leading server reachable!")
             print("try again!")
-            self.udp_socket.close()
+            # self.udp_socket.close()
             time.sleep(1)
-            self.__create_udp_socket()
+            # self.__create_udp_socket()
             self.__send_heartbeat()
             return
         if addr != self.communication_partner:
@@ -153,6 +153,11 @@ class ExecutingClient:
                     self.__send_ack(connection=connection, msg_uuid=data_frame[3])
                 elif (data_frame[2] == "heartbeat"):
                     msg = self.__state_message("dynamic_discovery")
-                    connection.send(msg.encode())
+                    try:
+                        connection.send(msg.encode())
+                    except:
+                        self.socket.listen(1)
+                        connection, addr = self.socket.accept()
+                        connection.send(msg.encode())
                     self.my_lamport_clock += 1
             self.__check_state()

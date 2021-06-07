@@ -31,15 +31,6 @@ class Replication:
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    # def create_multicast_receiver(self):
-    #     # Create the socket
-    #     self.multi_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #     # Bind to the server address
-    #     self.multi_sock.bind(self.server_address)
-    #     group = socket.inet_aton(self.multicast_group)
-    #     mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-    #     self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
     def send_replication_message(self, ec_dict_str: str):  # only in use from primary
         msg = create_frame(priority=0, role="S", message_type="replication", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.replication_clock,

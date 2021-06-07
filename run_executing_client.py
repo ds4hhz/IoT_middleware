@@ -1,14 +1,14 @@
 from Executing_Client import ExecutingClient
 from multiprocessing import Process
 import time
+import sys
 
-executing_client_obj = ExecutingClient()
-executing_client_obj2 = ExecutingClient(port=11111)
-# executing_client_obj.run()
+if "-p" in sys.argv:
+    tcp_port = sys.argv[sys.argv.index("-p") + 1]
+else:
+    tcp_port = 11000
+tcp_address = (int(tcp_port))
+print("tcp socket address: {}".format(tcp_address))
 
-executing_client1 = Process(target=executing_client_obj.run, name="EC1")
-executing_client2 = Process(target=executing_client_obj2.run, name="EC2")
-executing_client2.start()
-time.sleep(1)
-# executing_client1.start()
+executing_client_obj = ExecutingClient(port=tcp_address)
 executing_client_obj.run()

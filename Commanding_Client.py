@@ -70,9 +70,9 @@ class CommandingClient:
         except socket.timeout:
             print("No leading server reachable!")
             print("try again!")
-            self.udp_socket.close()
+            # self.udp_socket.close()
             time.sleep(1)
-            self.__create_multicast_socket()
+            # self.__create_multicast_socket()
             self.__send_heartbeat()
             return
         if addr != self.communication_partner:
@@ -108,6 +108,7 @@ class CommandingClient:
     def __create_tcp_socket(self):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.tcp_socket.settimeout(2)
+        print("open connection to: {} {}".format(self.communication_partner[0], self.tcp_port))
         self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
 
     def __send_state_change_request(self, ex_uuid, state):
