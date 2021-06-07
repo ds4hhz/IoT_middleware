@@ -52,7 +52,7 @@ class Server:
 
     def __create_multicast_socket_member_discovery(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.udp_socket.settimeout(3)
+        self.udp_socket.settimeout(2)
         ttl = struct.pack('b', 1)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
@@ -119,7 +119,7 @@ class Server:
                 return
             print("try again!")
             self.udp_socket.close()
-            time.sleep(3)
+            time.sleep(1)
             self.__create_multicast_socket_member_discovery()
             self.__send_heartbeat_message_s()
             return
