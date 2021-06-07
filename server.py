@@ -268,7 +268,7 @@ class Server:
         try:
             ex_tcp_con.connect(EC_connection)
             ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
-                                     payload).encode())
+                                         payload).encode())
         except:
             print("lost connection to EC")
             ex_tcp_con.connect(EC_connection)
@@ -321,6 +321,11 @@ class Server:
         self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
+
+    def __state_change_ack_to_CC2(self, payload, message_id, state_request,CC_conn, CC_addr):  # to CC
+        CC_conn.send(
+            create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
+                         "update your ex_dict, state ={}".format(state_request)).encode())
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
             create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
@@ -332,17 +337,47 @@ class Server:
             data_frame, address = self.__dynamic_discovery()
             # self.__dynamic_discovery_ack(data_frame, address)
 
-    def run_tcp_socket(self):
-        self.__open_tcp_socket()  # socket for CC communication
-        while (True):
-            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_state_change_request()
-            if (data_received):
+    def __open_tcp_socket_2(self):
+        self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client for CC connection
+        self.tcp_socket.bind(self.tcp_addr)
+
+    def __receive_request_from__CC(self, CC_conn , CC_addr):
+        data = CC_conn.recvfrom(2048)  # ToDo: Logik um zu erfassen, welche Verbindung
+        print("data received from CC")
+        payload = None
+        message_id = None
+        state_request = None
+        target_ec_uuid = None
+        if (len(data[0]) == 0):
+            print("connection lost!")
+            CC_conn.close()
+            # listen for new connection
+            self.tcp_socket.listen(1)  # allows 1 CCs
+            CC_conn, CC_addr = self.tcp_socket.accept()
+            data_received = False
+        else:
+            data_received = True
+            data_frame = in_filter(data[0].decode(), CC_addr)
+            target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
+            state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
+            payload = "{}, [{}]".format(target_ec_uuid, state_request)
+            message_id = data_frame[3]
+            print("payload: ", payload)
+            # update ex_dict after state
+        return data_received, payload, message_id, state_request, target_ec_uuid
+
+    def __handle_CC_communication(self, CC_conn, CC_addr):
+        while True:
+            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,CC_addr)
+            if data_received:
                 EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
                                                                                   state_request, EC_address)
-                if (got_state_change_request):
-                    if (data_received):
-                        self.__state_change_ack_to_CC(payload, message_id, state_request)
+                print("state change request sendet to EC")
+                if got_state_change_request:
+                    if data_received:
+                        self.__state_change_ack_to_CC2(payload, message_id, state_request,CC_conn,CC_addr)
+                        print("send ack to CC")
                     else:
                         # self.run_tcp_socket() #ToDo: negative ack
                         continue
@@ -351,6 +386,36 @@ class Server:
             else:
                 continue
                 # self.__open_tcp_socket()
+
+    def __tcp_listener(self):
+        self.tcp_socket.listen(20)  # allows 1 CCs
+        while True:
+            CC_conn, CC_addr = self.tcp_socket.accept()
+            print("Server accept new CC connection!")
+            thread = Thread(target=self.__handle_CC_communication, args=(CC_conn, CC_addr))
+            thread.start()
+
+    def run_tcp_socket(self):
+        self.__open_tcp_socket_2()
+        self.__tcp_listener()
+        # self.__open_tcp_socket()  # socket for CC communication
+        # while True:
+        #     data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_state_change_request()
+        #     if (data_received):
+        #         EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+        #         got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
+        #                                                                           state_request, EC_address)
+        #         if (got_state_change_request):
+        #             if (data_received):
+        #                 self.__state_change_ack_to_CC(payload, message_id, state_request)
+        #             else:
+        #                 # self.run_tcp_socket() #ToDo: negative ack
+        #                 continue
+        #         else:
+        #             continue
+        #     else:
+        #         continue
+        #         # self.__open_tcp_socket()
 
     def run_heartbeat_EC(self):
         self.scheduler_ec.run()
@@ -400,7 +465,6 @@ class Server:
             time.sleep(3)
             if not self.is_leader:
                 self.run_heartbeat_s()
-
 
 
 if "-p" in sys.argv:
