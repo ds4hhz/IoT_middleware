@@ -43,7 +43,7 @@ class ExecutingClient:
     def __tcp_listener(self):
         print("open TCP socket: ", (self.client_address, self.client_port))
         self.socket.bind((self.client_address, self.client_port))
-        self.tcp_socket.listen(20)  # allows 1 CCs
+        self.socket.listen(20)  # allows 20 server
         while True:
             CC_conn, CC_addr = self.tcp_socket.accept()
             print("EC accept new server connection!")
