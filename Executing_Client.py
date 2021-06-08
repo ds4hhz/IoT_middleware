@@ -57,10 +57,10 @@ class ExecutingClient:
             except:
                 pass    # leading server has died! #ToDo: create new connection to leading server!
             if (len(data[0]) == 0):
-                conn.close()
-                time.sleep(1)
-                self.socket.listen(1)
-                conn, addr = self.socket.accept()
+                # conn.close()
+                # time.sleep(1)
+                # self.socket.listen(1)
+                # conn, addr = self.socket.accept()
                 continue
             else:
                 data_frame = in_filter(data[0].decode(), addr)
