@@ -13,7 +13,7 @@ import sched
 
 
 class ExecutingClient:
-    def __init__(self, address='', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
+    def __init__(self, address='0.0.0.0', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
                  multicast_port=10000):
         self.client_address = address
         self.client_port = port
