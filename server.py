@@ -273,13 +273,15 @@ class Server:
         except ConnectionRefusedError:
             return False
         try:
-            self.ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
-                                         payload).encode())
+            self.ex_tcp_con.send(
+                create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
+                             payload).encode())
         except:
             print("lost connection to EC")
             self.ex_tcp_con.connect(EC_connection)
-            self.ex_tcp_con.send(create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
-                                         payload).encode())
+            self.ex_tcp_con.send(
+                create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
+                             payload).encode())
         try:
             data = self.ex_tcp_con.recv(2048)
         except:
@@ -328,11 +330,11 @@ class Server:
         self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
-
-    def __state_change_ack_to_CC2(self, payload, message_id, state_request,CC_conn, CC_addr):  # to CC
+    def __state_change_ack_to_CC2(self, payload, message_id, state_request, CC_conn, CC_addr):  # to CC
         CC_conn.send(
             create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
                          "update your ex_dict, state ={}".format(state_request)).encode())
+
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
             create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
@@ -348,7 +350,7 @@ class Server:
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client for CC connection
         self.tcp_socket.bind(self.tcp_addr)
 
-    def __receive_request_from__CC(self, CC_conn , CC_addr):
+    def __receive_request_from__CC(self, CC_conn, CC_addr):
         data = CC_conn.recvfrom(2048)  # ToDo: Logik um zu erfassen, welche Verbindung
         print("data received from CC")
         payload = None
@@ -357,10 +359,10 @@ class Server:
         target_ec_uuid = None
         if (len(data[0]) == 0):
             print("connection lost!")
-            CC_conn.close()
-            # listen for new connection
-            self.tcp_socket.listen(1)  # allows 1 CCs
-            CC_conn, CC_addr = self.tcp_socket.accept()
+            # CC_conn.close()
+            # # listen for new connection
+            # self.tcp_socket.listen(1)  # allows 1 CCs
+            # CC_conn, CC_addr = self.tcp_socket.accept()
             data_received = False
         else:
             data_received = True
@@ -376,7 +378,8 @@ class Server:
     def __handle_CC_communication(self, CC_conn, CC_addr):
         self.__create_tcp_socket_EC()
         while True:
-            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,CC_addr)
+            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
+                                                                                                                CC_addr)
             if data_received:
                 EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
@@ -384,7 +387,7 @@ class Server:
                 print("state change request sendet to EC")
                 if got_state_change_request:
                     if data_received:
-                        self.__state_change_ack_to_CC2(payload, message_id, state_request,CC_conn,CC_addr)
+                        self.__state_change_ack_to_CC2(payload, message_id, state_request, CC_conn, CC_addr)
                         print("send ack to CC")
                         # self.run_tcp_socket() #ToDo: negative ack
                         continue
