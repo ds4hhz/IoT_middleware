@@ -141,6 +141,11 @@ class CommandingClient:
                 self.__create_tcp_socket()
                 self.__send_state_change_request(ex_uuid, state)
                 break
+            elif data_frame[2] == "error":
+                self.tcp_socket.close()
+                self.__create_tcp_socket()
+                self.__send_state_change_request(ex_uuid, state)
+                break
             data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
             print("ack from Server: ", data_frame)

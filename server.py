@@ -351,7 +351,7 @@ class Server:
         self.tcp_socket.bind(self.tcp_addr)
 
     def __receive_request_from__CC(self, CC_conn, CC_addr):
-        data = CC_conn.recvfrom(2048)  # ToDo: Logik um zu erfassen, welche Verbindung
+        data = CC_conn.recvfrom(2048)
         print("data received from CC")
         payload = None
         message_id = None
@@ -359,6 +359,9 @@ class Server:
         target_ec_uuid = None
         if (len(data[0]) == 0):
             print("connection lost!")
+            msg = create_frame(1, "S", "error", uuid.uuid4(), self.my_uuid, 1, self.my_clock, "error!")
+            CC_conn.send(msg.encode())
+            # ToDo: send message to CC to close connection and start new
             # CC_conn.close()
             # # listen for new connection
             # self.tcp_socket.listen(1)  # allows 1 CCs

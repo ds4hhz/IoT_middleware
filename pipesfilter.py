@@ -24,6 +24,7 @@ class MessageType(Enum):
     group_discovery_ack = 12
     tcp_port_request = 13
     tcp_port_request_ack = 14
+    error = 15
 
 
 # todo: Prios für messages bestimmen
