@@ -127,14 +127,14 @@ class CommandingClient:
         while (True):
             try:
                 data, add = self.tcp_socket.recvfrom(2048)
-            except:
+            except socket.timeout :
                 # reopen tcp connection
                 self.tcp_socket.close()
                 self.__get_tcp_port()
                 self.__get_server()
                 self.__create_tcp_socket()
-                self.__send_state_change_request(ex_uuid, state)
-                return
+                self.tcp_socket.send(msg.encode())
+                continue
             if (len(data) == 0):
                 print("connection lost!")
                 self.tcp_socket.close()
