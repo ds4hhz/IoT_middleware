@@ -111,6 +111,35 @@ class CommandingClient:
         print("open connection to: {} {}".format(self.communication_partner[0], self.tcp_port))
         self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
 
+    def __send_state_change_request_udp(self,ex_uuid, state):
+        state_change_msg_id = uuid.uuid4()
+        msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
+                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
+                           payload="{}, [{}]".format(ex_uuid, state))
+        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+        # wait for ack
+        while (True):
+            try:
+                data, add = self.udp_socket.recvfrom(2048)
+            except socket.timeout:
+                self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
+                continue
+            data_frame = in_filter(data.decode(), add)
+            if data_frame[2] == "error":
+                self.tcp_socket.close()
+                self.__create_tcp_socket()
+                self.__send_state_change_request(ex_uuid, state)
+                break
+            # if ack for state_change, than update ex_dict
+            print("ack from Server: ", data_frame)
+            if (data_frame[2] == "state_change_ack" and data_frame[3] == str(state_change_msg_id)):
+                self.ex_dict[ex_uuid] = state
+                print("update EC state: ", self.ex_dict)
+                # tcp_socket.close()
+                break
+            else:
+                print("wrong message, wait for state_change_ack")
+
     def __send_state_change_request(self, ex_uuid, state):
         state_change_msg_id = uuid.uuid4()
         msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
@@ -172,10 +201,10 @@ class CommandingClient:
     def run(self):
         heartbeat_thread = Thread(target=self.run_heartbeat_S, name="heartbeat_thread")
         self.__create_multicast_socket()
-        self.__get_tcp_port()
-        print("tcp_port: ", self.tcp_port)
+        # self.__get_tcp_port()
+        # print("tcp_port: ", self.tcp_port)
         self.__get_server()  # dictionary mit executing clients
-        self.__create_tcp_socket()
+        # self.__create_tcp_socket()
         heartbeat_thread.start()
         while (True):
             print(self.ex_dict)
@@ -190,7 +219,13 @@ class CommandingClient:
             if (executing_client_uuid == "update"):
                 self.__get_server()
                 continue
+            elif not executing_client_uuid in self.ex_dict:
+                print("Please type a UUID from the list!")
+                print("update list of ECs")
+                print(
+                    "please enter the UUID of the client for the state change request or type \"update\" for update of ECs:")
+                executing_client_uuid = str(input())
             print("please enter the state you want, possible states are \"off, on , blinking\" ")
             executing_client_state = str(input())
-            self.__send_state_change_request(executing_client_uuid, executing_client_state)
+            self.__send_state_change_request_udp(executing_client_uuid, executing_client_state)
             self.__get_server()  # update states of ECs

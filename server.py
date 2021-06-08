@@ -159,6 +159,17 @@ class Server:
             self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
+        elif data_frame[1] == "CC" and data_frame[2] == "state_change_request":  # TODO: <<<------------>>>>>>>
+            target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
+            state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
+            payload = "{}, [{}]".format(target_ec_uuid, state_request)
+            EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+            got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
+                                                                              state_request, EC_address)
+            ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
+                                   "update your ex_dict, state ={}".format(state_request))
+            self.udp_socket.sendto( ack_msg.encode(), address)
+            # ToDO: send ack to CC
         elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
             self.__send_tcp_port(address)
         # election messages
@@ -264,6 +275,21 @@ class Server:
 
     def __create_tcp_socket_EC(self):
         self.ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def __send_state_change_request_to_EC_udp(self, message_id, payload, cc_uuid, state_request):
+        self.udp_socket.sendto(
+            create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
+                         payload).encode(), (self.multicast_group, self.multicast_port))
+        while True:
+            try:
+                data, addr = self.udp_socket.recv(2048)
+            except:
+                # try again
+                self.__send_state_change_request_to_EC_udp(message_id, payload, cc_uuid, state_request)
+                return
+            data_frame = in_filter(data, addr)
+            if data_frame[2] == "state_change_ack" and data_frame[3] == message_id:
+                return True
 
     def __send_state_change_request_to_EC(self, message_id, payload, cc_uuid, state_request, EC_connection: tuple):
 
@@ -469,6 +495,7 @@ class Server:
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
         heartbeat_thread_s.start()
+        self.__create_tcp_socket_EC()
         if not self.is_leader:
             secondary_thread.start()
         heartbeat_thread_EC.start()

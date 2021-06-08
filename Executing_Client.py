@@ -111,6 +111,9 @@ class ExecutingClient:
         print("received data from Server: ", data.decode())
         self.communication_partner = addr
 
+    def __multicast_receiver(self):
+        self.udp_socket
+
     def __state_change(self, state_request):
         if state_request in self.state_list:
             self.state = state_request
