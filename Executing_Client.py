@@ -69,7 +69,7 @@ class ExecutingClient:
                     self.__state_change(
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
                     # state wird so erwartet: [blinking]
-                    self.__send_ack(connection=connection, msg_uuid=data_frame[3])
+                    self.__send_ack(connection=conn, msg_uuid=data_frame[3])
                 elif (data_frame[2] == "heartbeat"):
                     msg = self.__state_message("dynamic_discovery")
                     try:
