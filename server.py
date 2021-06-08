@@ -472,7 +472,7 @@ if "-p" in sys.argv:
     tcp_port = sys.argv[sys.argv.index("-p") + 1]
 else:
     tcp_port = 12000
-tcp_address = ("", int(tcp_port))
+tcp_address = ("0.0.0.0", int(tcp_port))
 print("tcp socket address: {}".format(tcp_address))
 
 server3 = Server(tcp_address)
