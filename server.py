@@ -498,7 +498,7 @@ class Server:
         self.__create_tcp_socket_EC()
         if not self.is_leader:
             secondary_thread.start()
-        heartbeat_thread_EC.start()
+        # heartbeat_thread_EC.start()
         tcp_thread.start()
         while True:  # main thread for election and replication
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))

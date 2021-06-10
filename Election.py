@@ -118,8 +118,9 @@ class Election:
         for member in range(len(self.members)):
             try:
                 data, address = self.udp_socket.recvfrom(2048)
-            except:
-                self.__send_leader_message()
+            except socket.timeout:
+                continue
+                # self.__send_leader_message()
             data_frame = in_filter(data.decode(), address)
             if data_frame[4] in copy_of_members:
                 copy_of_members.pop(copy_of_members.index(data_frame[4]))
@@ -166,7 +167,7 @@ class Election:
                         self.is_leader = True
                         self.__send_leader_message()
                 # else:
-                    # self.__send_election_ack(address)  # election starter is not leader! ToDo: kei ack bedeutet 3 neue versuche!
+                    # self.__send_election_ack(address)  # election starter is not leader! ToDo: kein ack bedeutet 3 neue versuche!
                     # self.election()  # starts election with bigger members
 
     def send_election_start_message(self):
