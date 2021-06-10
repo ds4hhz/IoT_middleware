@@ -119,14 +119,14 @@ class Server:
                 return
             print("try again!")
             self.udp_socket.close()
-            time.sleep(3)
+            time.sleep(1)
             self.__create_multicast_socket_member_discovery()
             self.__send_heartbeat_message_s()
             return
         if addr != self.leading_server_address:
             print("leading server has changed!")
             self.leading_server_address = addr
-        self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__send_heartbeat_message_s)
+        # self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__send_heartbeat_message_s)
 
     def __create_multicast_socket(self):
         # Create the socket
@@ -183,7 +183,7 @@ class Server:
             print("leader message received")
             self.is_leader = False
             self.running_election = False
-            self.run_heartbeat_s()
+            # self.run_heartbeat_s()
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
@@ -486,7 +486,7 @@ class Server:
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
         heartbeat_thread_EC = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread_EC")
-        heartbeat_thread_s = Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s")
+        # heartbeat_thread_s = Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s")
         secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()
         self.run_member_discovery()
@@ -494,7 +494,7 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
-        heartbeat_thread_s.start()
+        # heartbeat_thread_s.start()
         self.__create_tcp_socket_EC()
         if not self.is_leader:
             secondary_thread.start()
@@ -504,7 +504,7 @@ class Server:
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
             time.sleep(3)
             if not self.is_leader:
-                self.run_heartbeat_s()
+                self.__send_heartbeat_message_s()
 
 
 if "-p" in sys.argv:
