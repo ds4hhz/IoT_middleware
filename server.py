@@ -178,11 +178,14 @@ class Server:
             self.is_leader = False
             self.__send_election_ack(address)
         elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
-            self.__send_leader_message_ack(address)
-            self.leading_server_address = address
-            print("leader message received")
-            self.is_leader = False
-            self.running_election = False
+            if data_frame[4] < str(self.my_uuid):
+                self.election_obj.run_election()
+            else:
+                self.__send_leader_message_ack(address)
+                self.leading_server_address = address
+                print("leader message received")
+                self.is_leader = False
+                self.running_election = False
             # self.run_heartbeat_s()
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
