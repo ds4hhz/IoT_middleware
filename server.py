@@ -455,6 +455,7 @@ class Server:
                 except KeyError:
                     print("unknown PPID!")
                     self.__negative_state_change_ack(payload, message_id, state_request, CC_conn, CC_addr)
+                    continue
 
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
                                                                                   state_request, EC_address)
