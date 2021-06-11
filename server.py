@@ -450,6 +450,8 @@ class Server:
             data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
                                                                                                                 CC_addr)
             if data_received:
+                print("executing clients before state change request: {}".format(self.ec_dict))
+                print("PPID of executing Client: {}".format(target_ec_uuid))
                 try:
                     EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
                 except KeyError:
@@ -483,24 +485,6 @@ class Server:
     def run_tcp_socket(self):
         self.__open_tcp_socket_2()
         self.__tcp_listener()
-        # self.__open_tcp_socket()  # socket for CC communication
-        # while True:
-        #     data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_state_change_request()
-        #     if (data_received):
-        #         EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
-        #         got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
-        #                                                                           state_request, EC_address)
-        #         if (got_state_change_request):
-        #             if (data_received):
-        #                 self.__state_change_ack_to_CC(payload, message_id, state_request)
-        #             else:
-        #                 # self.run_tcp_socket() #ToDo: negative ack
-        #                 continue
-        #         else:
-        #             continue
-        #     else:
-        #         continue
-        #         # self.__open_tcp_socket()
 
     def run_heartbeat_EC(self):
         self.scheduler_ec.run()
