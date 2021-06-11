@@ -45,7 +45,7 @@ class Server:
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
         # heartbeat leading Server
-        self.heartbeat_period_server = 1
+        self.heartbeat_period_server = 3
         self.scheduler_s = sched.scheduler(time.time, time.sleep)
         self.scheduler_s.enter(self.heartbeat_period_server, 1, self.__send_heartbeat_message_s)
         self.leading_server_address = ""
@@ -121,7 +121,7 @@ class Server:
                 return
             print("try again!")
             self.udp_socket.close()
-            time.sleep(1)
+            time.sleep(2)
             self.__create_multicast_socket_member_discovery()
             self.__send_heartbeat_message_s()
             return
