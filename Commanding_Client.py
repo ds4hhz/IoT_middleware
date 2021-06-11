@@ -183,6 +183,9 @@ class CommandingClient:
                 self.__create_tcp_socket()
                 self.__send_state_change_request(ex_uuid, state)
                 break
+            elif data_frame[2] == "state_change_ack_err":
+                print("wrong PPID!")
+                break
             data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
             print("ack from Server: ", data_frame)
@@ -233,6 +236,9 @@ class CommandingClient:
                 print(
                     "please enter the UUID of the client for the state change request or type \"update\" for update of ECs:")
                 executing_client_uuid = str(input())
+                if (executing_client_uuid == "update"):
+                    self.__get_server()
+                    continue
             print("please enter the state you want, possible states are \"off, on , blinking\" ")
             executing_client_state = str(input())
             # self.__send_state_change_request_udp(executing_client_uuid, executing_client_state)

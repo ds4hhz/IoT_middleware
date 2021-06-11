@@ -319,8 +319,7 @@ class Server:
         # ex_tcp_con.connect(('127.0.0.1', 11000))
         try:
             self.ex_tcp_con.connect(EC_connection)
-        except ConnectionRefusedError as e:
-            print(e)
+        except:
             print("connection address: ".format(EC_connection))
             return False
         try:
@@ -393,6 +392,11 @@ class Server:
             create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
                          "update your ex_dict, state ={}".format(state_request)).encode())
 
+    def __negative_state_change_ack(self,payload, message_id, state_request, CC_conn, CC_addr):
+        CC_conn.send(
+            create_frame(1, "S", "state_change_ack_err", message_id, self.my_uuid, 1, self.my_clock,
+                         "").encode())
+
     def __state_change_ack_to_CC(self, payload, message_id, state_request):  # to CC
         self.CC_connection_list[-1].send(
             create_frame(1, "S", "state_change_ack", message_id, self.my_uuid, 1, self.my_clock,
@@ -446,7 +450,12 @@ class Server:
             data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
                                                                                                                 CC_addr)
             if data_received:
-                EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
+                try:
+                    EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
+                except KeyError:
+                    print("unknown PPID!")
+                    self.__negative_state_change_ack(payload, message_id, state_request, CC_conn, CC_addr)
+
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
                                                                                   state_request, EC_address)
                 print("state change request sendet to EC")
