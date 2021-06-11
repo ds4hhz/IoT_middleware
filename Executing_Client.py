@@ -32,6 +32,7 @@ class ExecutingClient:
         self.heartbeat_period = 5
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
+        self.lost_server = False
 
     def __bind_socket(self):
         print("open TCP socket: ", (self.client_address, self.client_port))
@@ -136,11 +137,15 @@ class ExecutingClient:
         except socket.timeout:
             print("No leading server reachable!")
             print("try again!")
+            self.lost_server = True
             # self.udp_socket.close()
             time.sleep(1)
             # self.__create_udp_socket()
             self.__send_heartbeat()
             return
+        if self.lost_server:
+            self.get_server()
+            self.lost_server = False
         if addr != self.communication_partner:
             print("leading server has changed!")
             self.communication_partner = addr

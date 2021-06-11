@@ -450,8 +450,6 @@ class Server:
             data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
                                                                                                                 CC_addr)
             if data_received:
-                print("executing clients before state change request: {}".format(self.ec_dict))
-                print("PPID of executing Client: {}".format(target_ec_uuid))
                 try:
                     EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
                 except KeyError:
