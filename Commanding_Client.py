@@ -119,7 +119,7 @@ class CommandingClient:
                            payload="{}, [{}]".format(ex_uuid, state))
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         # wait for ack
-        while (True):
+        while True:
             try:
                 data, add = self.udp_socket.recvfrom(2048)
             except socket.timeout:
@@ -154,16 +154,22 @@ class CommandingClient:
         print("length of the message: ", len(msg.encode()))
         print("message id of change state request: ", state_change_msg_id)
         # wait for ack
-        while (True):
+        while True:
             try:
                 data, add = self.tcp_socket.recvfrom(2048)
-            except socket.timeout:
+            except socket.timeout as e:
+                print(e)
                 # reopen tcp connection
-                self.tcp_socket.close()
-                self.__get_tcp_port()
-                self.__get_server()
-                self.__create_tcp_socket()
-                self.tcp_socket.send(msg.encode())
+                try:
+                    self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
+                    self.tcp_socket.send(msg.encode())
+                    continue
+                except:
+                    self.tcp_socket.close()
+                    self.__get_tcp_port()
+                    self.__get_server()
+                    self.__create_tcp_socket()
+                    self.tcp_socket.send(msg.encode())
                 continue
             data_frame = in_filter(data.decode(), add)
             if (len(data) == 0):
