@@ -215,6 +215,7 @@ class Server:
                     print(self.ec_dict)
                 # self.__dynamic_discovery_ack(data_frame, address)
             elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
+                print("get heartbeat msg from secondary")
                 self.__send_heartbeat_ack(address)
             elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
                 print("receive heartbeat from CC")
@@ -227,6 +228,7 @@ class Server:
         msg = create_frame(1, "S", "heartbeat_ack ", uuid.uuid4(), self.my_uuid, 1, self.my_clock,
                            "heartbeat received!")
         self.multi_sock.sendto(msg.encode(), address)
+        print("heartbeat ack sent")
         self.my_clock += 1
 
     def __group_discovery_ack(self, address):
