@@ -159,7 +159,7 @@ class Server:
             self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
-        elif data_frame[1] == "CC" and data_frame[2] == "state_change_request":  # TODO: <<<------------>>>>>>>
+        elif self.is_leader and data_frame[1] == "CC" and data_frame[2] == "state_change_request":  # TODO: <<<------------>>>>>>>
             print("state change request from CC")
             target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
             state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
@@ -196,14 +196,17 @@ class Server:
             self.running_election = False
         # heartbeat messages
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "EC":
+            print("receive heartbeat from EC")
             self.__send_heartbeat_ack(address)
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
+                print(self.ec_dict)
             # self.__dynamic_discovery_ack(data_frame, address)
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
             self.__send_heartbeat_ack(address)
         elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
+            print("receive heartbeat from CC")
             self.__send_heartbeat_ack(address)
         return data_frame, address
 
