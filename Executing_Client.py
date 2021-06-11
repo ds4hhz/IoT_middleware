@@ -62,7 +62,7 @@ class ExecutingClient:
                 # self.socket.listen(1)
                 # conn, addr = self.socket.accept()
                 print("get zero message")
-                continue
+                break # close connection and wait for a new one
             else:
                 data_frame = in_filter(data[0].decode(), addr)
                 # print("received data from TCP connection: ", data_frame)
