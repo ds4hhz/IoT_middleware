@@ -335,6 +335,7 @@ class Server:
             print("received data from EC: ", data[0])
             self.ec_dict[cc_uuid][0] = state_request
             self.ex_tcp_con.close()
+            self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
             return True
         else:
             self.ex_tcp_con.close()
