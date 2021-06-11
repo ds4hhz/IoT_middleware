@@ -36,6 +36,7 @@ class Replication:
         msg = create_frame(priority=0, role="S", message_type="replication", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.replication_clock,
                            payload=ec_dict_str)
+        print(msg)
         self.multi_sock.sendto(msg.encode(), (self.multicast_group, self.server_address[1]))
         self.replication_clock += 1
         copy_of_members = self.members.copy()

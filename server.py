@@ -146,78 +146,81 @@ class Server:
     def __dynamic_discovery(self):  # messages over multicast group
         data, address = self.multi_sock.recvfrom(2048)
         data_frame = in_filter(data.decode(), address)
-        if data_frame[1] == "CC" and data_frame[2] == "ec_list_query" and self.is_leader:
-            # send dict of all known executing clients with state
-            msg = create_frame(1, "S", "ec_list_query_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
-                               json.dumps(self.ec_dict))
-            self.multi_sock.sendto(msg.encode(), address)
-            print("Send message to CC: ", msg)
-            self.my_clock += 1
-        elif data_frame[1] == "EC" and data_frame[2] == "dynamic_discovery" and self.is_leader:
-            self.__dynamic_discovery_ack(data_frame, address)
-            temp_dict = json.loads(data_frame[7])
-            for k, v in temp_dict.items():
-                self.ec_dict[k] = v
-            self.ec_addresses[data_frame[4]] = address[0]
-            print("executing client addresses: {}".format(self.ec_addresses))
-            try:
-                self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-            except:
-                print("rep msg")
-        elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
-            self.__group_discovery_ack(address)
-        elif self.is_leader and data_frame[1] == "CC" and data_frame[
-            2] == "state_change_request":  # TODO: <<<------------>>>>>>>
-            print("state change request from CC")
-            target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
-            state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
-            payload = "{}, [{}]".format(target_ec_uuid, state_request)
-            # EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
-            EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
-            print("address of executing client {}".format(EC_address))
-            got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
-                                                                              state_request, EC_address)
-            ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
-                                   "update your ex_dict, state ={}".format(state_request))
-            self.udp_socket.sendto(ack_msg.encode(), address)
-            # ToDO: send ack to CC
-        elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
-            self.__send_tcp_port(address)
-        # election messages
-        elif data_frame[2] == "election":
-            self.running_election = True
-            self.is_leader = False
-            self.__send_election_ack(address)
-        elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
-            if data_frame[4] < str(self.my_uuid):
-                print("leader msg from server with smaller PPID")
-                self.election_obj.run_election()
-            else:
-                self.__send_leader_message_ack(address)
-                self.leading_server_address = address
-                print("leader message received")
+        try:
+            if data_frame[1] == "CC" and data_frame[2] == "ec_list_query" and self.is_leader:
+                # send dict of all known executing clients with state
+                msg = create_frame(1, "S", "ec_list_query_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
+                                   json.dumps(self.ec_dict))
+                self.multi_sock.sendto(msg.encode(), address)
+                print("Send message to CC: ", msg)
+                self.my_clock += 1
+            elif data_frame[1] == "EC" and data_frame[2] == "dynamic_discovery" and self.is_leader:
+                self.__dynamic_discovery_ack(data_frame, address)
+                temp_dict = json.loads(data_frame[7])
+                for k, v in temp_dict.items():
+                    self.ec_dict[k] = v
+                self.ec_addresses[data_frame[4]] = address[0]
+                print("executing client addresses: {}".format(self.ec_addresses))
+                try:
+                    self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+                except:
+                    print("rep msg")
+            elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
+                self.__group_discovery_ack(address)
+            elif self.is_leader and data_frame[1] == "CC" and data_frame[
+                2] == "state_change_request":  # TODO: <<<------------>>>>>>>
+                print("state change request from CC")
+                target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
+                state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
+                payload = "{}, [{}]".format(target_ec_uuid, state_request)
+                # EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+                EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
+                print("address of executing client {}".format(EC_address))
+                got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
+                                                                                  state_request, EC_address)
+                ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
+                                       "update your ex_dict, state ={}".format(state_request))
+                self.udp_socket.sendto(ack_msg.encode(), address)
+                # ToDO: send ack to CC
+            elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
+                self.__send_tcp_port(address)
+            # election messages
+            elif data_frame[2] == "election":
+                self.running_election = True
                 self.is_leader = False
+                self.__send_election_ack(address)
+            elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
+                if data_frame[4] < str(self.my_uuid):
+                    print("leader msg from server with smaller PPID")
+                    self.election_obj.run_election()
+                else:
+                    self.__send_leader_message_ack(address)
+                    self.leading_server_address = address
+                    print("leader message received")
+                    self.is_leader = False
+                    self.running_election = False
+                # self.run_heartbeat_s()
+            elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
+                self.__send_leader_message_ack(address)
+                print("leader message received -> I'm the leader!")
+                self.is_leader = True
                 self.running_election = False
-            # self.run_heartbeat_s()
-        elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
-            self.__send_leader_message_ack(address)
-            print("leader message received -> I'm the leader!")
-            self.is_leader = True
-            self.running_election = False
-        # heartbeat messages
-        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "EC":
-            print("receive heartbeat from EC")
-            self.__send_heartbeat_ack(address)
-            temp_dict = json.loads(data_frame[7])
-            for k, v in temp_dict.items():
-                self.ec_dict[k] = v
-                print(self.ec_dict)
-            # self.__dynamic_discovery_ack(data_frame, address)
-        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
-            self.__send_heartbeat_ack(address)
-        elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
-            print("receive heartbeat from CC")
-            self.__send_heartbeat_ack(address)
+            # heartbeat messages
+            elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "EC":
+                print("receive heartbeat from EC")
+                self.__send_heartbeat_ack(address)
+                temp_dict = json.loads(data_frame[7])
+                for k, v in temp_dict.items():
+                    self.ec_dict[k] = v
+                    print(self.ec_dict)
+                # self.__dynamic_discovery_ack(data_frame, address)
+            elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "S":
+                self.__send_heartbeat_ack(address)
+            elif self.is_leader and data_frame[2] == "heartbeat" and data_frame[1] == "CC":
+                print("receive heartbeat from CC")
+                self.__send_heartbeat_ack(address)
+        except:
+            print("wtf")
         return data_frame, address
 
     def __send_heartbeat_ack(self, address):
