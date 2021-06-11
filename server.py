@@ -115,6 +115,7 @@ class Server:
                 self.group_member_list.clear()
                 self.run_member_discovery()
                 self.election_obj = Election(self.my_uuid, self.group_member_list)
+                print("heartbeat election")
                 self.election_obj.run_election()
                 # self.thread_list[-1].join()
                 return
@@ -186,6 +187,7 @@ class Server:
             self.__send_election_ack(address)
         elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
             if data_frame[4] < str(self.my_uuid):
+                print("leader msg fromserver with smaller PPID")
                 self.election_obj.run_election()
             else:
                 self.__send_leader_message_ack(address)
@@ -507,6 +509,7 @@ class Server:
         self.election_obj = Election(self.my_uuid, self.group_member_list)
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
+        print("start first election")
         self.election_obj.run_election()
         # heartbeat_thread_s.start()
         self.__create_tcp_socket_EC()
