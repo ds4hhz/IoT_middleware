@@ -490,8 +490,9 @@ class Server:
     def run_secondary(self):
         # self.replication_obj.create_multicast_sender()
         while True:
-            print("return of rep msg: {}".format(self.replication_obj.get_replication_message()))
+            # print("return of rep msg: {}".format(self.replication_obj.get_replication_message()))
             temp_dict_str = self.replication_obj.get_replication_message()
+            print(temp_dict_str)
             temp_dict = json.loads(temp_dict_str)
             if len(temp_dict) != 0:
                 for k, v in temp_dict.items():
