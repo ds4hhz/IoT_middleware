@@ -152,18 +152,20 @@ class Server:
             print("Send message to CC: ", msg)
             self.my_clock += 1
         elif data_frame[1] == "EC" and data_frame[2] == "dynamic_discovery" and self.is_leader:
+            self.__dynamic_discovery_ack(data_frame, address)
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
-            self.__dynamic_discovery_ack(data_frame, address)
             self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
         elif data_frame[1] == "CC" and data_frame[2] == "state_change_request":  # TODO: <<<------------>>>>>>>
+            print("state change request from CC")
             target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
             state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
             payload = "{}, [{}]".format(target_ec_uuid, state_request)
             EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+            print("address of executing client {}".format(EC_address))
             got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
                                                                               state_request, EC_address)
             ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
@@ -299,7 +301,8 @@ class Server:
         # ex_tcp_con.connect(('127.0.0.1', 11000))
         try:
             self.ex_tcp_con.connect(EC_connection)
-        except ConnectionRefusedError:
+        except ConnectionRefusedError as e:
+            print(e)
             return False
         try:
             self.ex_tcp_con.send(

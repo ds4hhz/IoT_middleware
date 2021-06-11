@@ -13,7 +13,7 @@ import sched
 
 
 class ExecutingClient:
-    def __init__(self, address='0.0.0.0', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
+    def __init__(self, address='', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
                  multicast_port=10000):
         self.client_address = address
         self.client_port = port
@@ -29,7 +29,7 @@ class ExecutingClient:
 
         # heartbeat on server
         # heartbeat
-        self.heartbeat_period = 3
+        self.heartbeat_period = 5
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
 
@@ -51,7 +51,7 @@ class ExecutingClient:
             thread.start()
 
     def __handle_tcp_communication(self,conn, addr):
-        while (True):
+        while True:
             try:
                 data = conn.recvfrom(self.buffer_size)
             except:
@@ -61,16 +61,19 @@ class ExecutingClient:
                 # time.sleep(1)
                 # self.socket.listen(1)
                 # conn, addr = self.socket.accept()
+                print("get zero message")
                 continue
             else:
                 data_frame = in_filter(data[0].decode(), addr)
                 # print("received data from TCP connection: ", data_frame)
                 if (data_frame[2] == "state_change_request"):
+                    print("get state change request")
                     self.__state_change(
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
                     # state wird so erwartet: [blinking]
                     self.__send_ack(connection=conn, msg_uuid=data_frame[3])
                 elif (data_frame[2] == "heartbeat"):
+                    print("get heartbeat message")
                     msg = self.__state_message("dynamic_discovery")
                     try:
                         conn.send(msg.encode())
@@ -104,8 +107,8 @@ class ExecutingClient:
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
-            self.udp_socket.close()
-            self.__create_udp_socket()
+            # self.udp_socket.close()
+            # self.__create_udp_socket()
             self.get_server()
             return
         print("received data from Server: ", data.decode())
@@ -177,7 +180,7 @@ class ExecutingClient:
         # connection, addr = self.__bind_socket()  # tcp socket to Server
         heartbeat_thread.start()
         self.__tcp_listener()
-        while (True):
+        while True:
             print("EC_client runs")
             time.sleep(5)
             # try:
