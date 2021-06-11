@@ -28,6 +28,7 @@ class Server:
         self.ec_dict = ec_dict
         self.CC_connection_list = []
         self.CC_address_list = []
+        self.ec_addresses = {}
 
         # election
         self.is_leader = False
@@ -156,21 +157,25 @@ class Server:
             temp_dict = json.loads(data_frame[7])
             for k, v in temp_dict.items():
                 self.ec_dict[k] = v
+            self.ec_addresses[data_frame[4]] = address[0]
+            print("executing client addresses: {}".format(self.ec_addresses))
             self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
         elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
             self.__group_discovery_ack(address)
-        elif self.is_leader and data_frame[1] == "CC" and data_frame[2] == "state_change_request":  # TODO: <<<------------>>>>>>>
+        elif self.is_leader and data_frame[1] == "CC" and data_frame[
+            2] == "state_change_request":  # TODO: <<<------------>>>>>>>
             print("state change request from CC")
             target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
             state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
             payload = "{}, [{}]".format(target_ec_uuid, state_request)
-            EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+            # EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+            EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
             print("address of executing client {}".format(EC_address))
             got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
                                                                               state_request, EC_address)
             ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
                                    "update your ex_dict, state ={}".format(state_request))
-            self.udp_socket.sendto( ack_msg.encode(), address)
+            self.udp_socket.sendto(ack_msg.encode(), address)
             # ToDO: send ack to CC
         elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
             self.__send_tcp_port(address)
