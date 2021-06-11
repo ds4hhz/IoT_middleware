@@ -50,19 +50,14 @@ class ExecutingClient:
             thread = Thread(target=self.__handle_tcp_communication, args=(CC_conn, CC_addr))
             thread.start()
 
-    def __handle_tcp_communication(self,conn, addr):
+    def __handle_tcp_communication(self, conn, addr):
         while True:
             try:
                 data = conn.recvfrom(self.buffer_size)
             except:
-                pass    # leading server has died! #ToDo: create new connection to leading server!
+                pass  # leading server has died! #ToDo: create new connection to leading server!
             if (len(data[0]) == 0):
-                # conn.close()
-                # time.sleep(1)
-                # self.socket.listen(1)
-                # conn, addr = self.socket.accept()
-                print("get zero message")
-                break # close connection and wait for a new one
+                break  # close connection and wait for a new one
             else:
                 data_frame = in_filter(data[0].decode(), addr)
                 # print("received data from TCP connection: ", data_frame)
@@ -149,6 +144,7 @@ class ExecutingClient:
         if addr != self.communication_partner:
             print("leading server has changed!")
             self.communication_partner = addr
+            print("new communication partner: {}".format(self.communication_partner))
         self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
 
     def __check_state(self):

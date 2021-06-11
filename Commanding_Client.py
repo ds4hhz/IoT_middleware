@@ -171,20 +171,11 @@ class CommandingClient:
                     self.__create_tcp_socket()
                     self.tcp_socket.send(msg.encode())
                 continue
-            data_frame = in_filter(data.decode(), add)
             if (len(data) == 0):
                 print("connection lost!")
                 self.tcp_socket.close()
                 self.__create_tcp_socket()
                 self.__send_state_change_request(ex_uuid, state)
-                break
-            elif data_frame[2] == "error":
-                self.tcp_socket.close()
-                self.__create_tcp_socket()
-                self.__send_state_change_request(ex_uuid, state)
-                break
-            elif data_frame[2] == "state_change_ack_err":
-                print("wrong PPID!")
                 break
             data_frame = in_filter(data.decode(), add)
             # if ack for state_change, than update ex_dict
@@ -193,6 +184,14 @@ class CommandingClient:
                 self.ex_dict[ex_uuid] = state
                 print("update EC state: ", self.ex_dict)
                 # tcp_socket.close()
+                break
+            elif data_frame[2] == "error":
+                self.tcp_socket.close()
+                self.__create_tcp_socket()
+                self.__send_state_change_request(ex_uuid, state)
+                break
+            elif data_frame[2] == "state_change_ack_err":
+                print("wrong PPID!")
                 break
             else:
                 print("wrong message, wait for state_change_ack")
