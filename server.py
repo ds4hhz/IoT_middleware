@@ -313,6 +313,7 @@ class Server:
             self.ex_tcp_con.connect(EC_connection)
         except ConnectionRefusedError as e:
             print(e)
+            print("connection address: ".format(EC_connection))
             return False
         try:
             self.ex_tcp_con.send(
@@ -403,7 +404,11 @@ class Server:
         if (len(data[0]) == 0):
             print("connection lost!")
             msg = create_frame(1, "S", "error", uuid.uuid4(), self.my_uuid, 1, self.my_clock, "error!")
-            CC_conn.send(msg.encode())
+            try:
+                CC_conn.send(msg.encode())
+            except:
+                CC_conn, CC_addr = self.tcp_socket.accept()
+                CC_conn.send(msg.encode())
             # ToDo: send message to CC to close connection and start new
             # CC_conn.close()
             # # listen for new connection

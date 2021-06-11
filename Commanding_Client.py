@@ -108,7 +108,7 @@ class CommandingClient:
 
     def __create_tcp_socket(self):
         self.tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.tcp_socket.settimeout(2)
+        self.tcp_socket.settimeout(3)
         print("open connection to: {} {}".format(self.communication_partner[0], self.tcp_port))
         self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
 
