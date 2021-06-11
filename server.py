@@ -432,7 +432,7 @@ class Server:
             data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
                                                                                                                 CC_addr)
             if data_received:
-                EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
+                EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
                 got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
                                                                                   state_request, EC_address)
                 print("state change request sendet to EC")
