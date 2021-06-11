@@ -74,4 +74,4 @@ class Replication:
                 self.ec_dict[k] = v
             print("ec dict in rep msg: ", self.ec_dict)
             return json.dumps(self.ec_dict)
-        return " fail"
+        return "fail"
