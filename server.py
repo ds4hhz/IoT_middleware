@@ -167,12 +167,14 @@ class Server:
             self.is_leader = False
             self.__send_election_ack(address)
         elif data_frame[2] == "leader_msg" and data_frame[4] != str(self.my_uuid):
-            self.__send_leader_message_ack(address)
-            self.leading_server_address = address
-            print("leader message received")
-            self.is_leader = False
-            self.running_election = False
-            self.run_heartbeat_s()
+            if data_frame[4] < str(self.my_uuid):
+                self.election_obj.run_election()
+            else:
+                self.__send_leader_message_ack(address)
+                self.leading_server_address = address
+                print("leader message received")
+                self.is_leader = False
+                self.running_election = False
         elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
             self.__send_leader_message_ack(address)
             print("leader message received -> I'm the leader!")
@@ -302,9 +304,9 @@ class Server:
         print("send tcp message to EC")
         del_list = []
         copy_ec_dict = self.ec_dict.copy()
+        ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         for key, item in copy_ec_dict.items():
             addr_tuple = (item[1], item[2])
-            ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             try:
                 ex_tcp_con.connect(addr_tuple)
             except:
@@ -321,7 +323,7 @@ class Server:
                 temp_dict = json.loads(data_frame[7])
                 for k, v in temp_dict.items():
                     self.ec_dict[k] = v
-            except:
+            except socket.timeout:
                 del_list.append(key)
         for key in del_list:
             del self.ec_dict[key]
@@ -460,7 +462,7 @@ class Server:
         tcp_thread = Thread(target=server.run_tcp_socket, name="tcp-thread")
         udp_thread = Thread(target=server.run_dynamic_discovery, name="discovery-thread")
         heartbeat_thread_EC = Thread(target=self.run_heartbeat_EC, name="heartbeat_thread_EC")
-        heartbeat_thread_s = Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s")
+        # heartbeat_thread_s = Thread(target=self.run_heartbeat_s, name="heartbeat_thread_s")
         secondary_thread = Thread(target=self.run_secondary, name="secondary_thread")
         udp_thread.start()
         self.run_member_discovery()
@@ -468,16 +470,16 @@ class Server:
         self.replication_obj = Replication(self.my_uuid, self.group_member_list)
         self.replication_obj.create_multicast_sender()
         self.election_obj.run_election()
-        heartbeat_thread_s.start()
+        # heartbeat_thread_s.start()
         if not self.is_leader:
             secondary_thread.start()
-        heartbeat_thread_EC.start()
+        # heartbeat_thread_EC.start()
         tcp_thread.start()
         while True:  # main thread for election and replication
             print("Node {} is leader: {}".format(self.my_uuid, self.is_leader))
             time.sleep(3)
             if not self.is_leader:
-                self.run_heartbeat_s()
+                self.__send_heartbeat_message_s()
 
 
 if "-p" in sys.argv:
