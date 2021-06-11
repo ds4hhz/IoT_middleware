@@ -165,6 +165,7 @@ class CommandingClient:
                 self.__create_tcp_socket()
                 self.tcp_socket.send(msg.encode())
                 continue
+            data_frame = in_filter(data.decode(), add)
             if (len(data) == 0):
                 print("connection lost!")
                 self.tcp_socket.close()

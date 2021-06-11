@@ -522,6 +522,7 @@ class Server:
             time.sleep(3)
             if not self.is_leader:
                 self.__send_heartbeat_message_s()
+                print("states of executing clients: {}".format(self.ec_dict))
 
 
 if "-p" in sys.argv:
