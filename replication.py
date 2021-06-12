@@ -74,7 +74,7 @@ class Replication:
             try:
                 data, address = self.multi_sock.recvfrom(self.max_response_size)
             except socket.timeout:
-                pass
+                continue
             break
         data_frame = in_filter(data.decode(), address)
         if data_frame[2] == "replication" and data_frame[4] != self.my_uuid:
