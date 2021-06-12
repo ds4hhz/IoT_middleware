@@ -70,7 +70,12 @@ class Replication:
         self.replication_clock += 1
 
     def get_replication_message(self):  # only used from secondary
-        data, address = self.multi_sock.recvfrom(self.max_response_size)
+        while True:
+            try:
+                data, address = self.multi_sock.recvfrom(self.max_response_size)
+            except socket.timeout:
+                pass
+            break
         data_frame = in_filter(data.decode(), address)
         if data_frame[2] == "replication" and data_frame[4] != self.my_uuid:
             self.__send_replication_message_ack()
