@@ -545,8 +545,7 @@ class Server:
                 self.__send_heartbeat_message_s()
                 print("states of executing clients: {}".format(self.ec_dict))
             else:
-                # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-                self.new_data = True
+                self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
                 self.new_data = False
 
 
