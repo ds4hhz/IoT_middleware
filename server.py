@@ -51,6 +51,9 @@ class Server:
         self.leading_server_address = ""
         self.server_heartbeat_fail_counter = 0
 
+        # replication
+        self.new_data = False
+
     def __create_multicast_socket_member_discovery(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(3)
@@ -161,10 +164,11 @@ class Server:
                     self.ec_dict[k] = v
                 self.ec_addresses[data_frame[4]] = address[0]
                 print("executing client addresses: {}".format(self.ec_addresses))
-                try:
-                    self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-                except:
-                    print("rep msg")
+                self.new_data = True
+                # try:
+                #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+                # except:
+                #     print("rep msg")
             elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
                 self.__group_discovery_ack(address)
             elif self.is_leader and data_frame[1] == "CC" and data_frame[
@@ -343,10 +347,11 @@ class Server:
             print("received data from EC: ", data[0])
             self.ec_dict[cc_uuid][0] = state_request
             self.ex_tcp_con.close()
-            try:
-                self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-            except:
-                print("rep msg")
+            self.new_data = True
+            # try:
+            #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+            # except:
+            #     print("rep msg")
             return True
         else:
             self.ex_tcp_con.close()
@@ -381,10 +386,11 @@ class Server:
             del self.ec_dict[key]
         print("EC_dict updated")
         print("EC_dict: ", self.ec_dict)
-        try:
-            self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-        except:
-            print("rep msg")
+        self.new_data = True
+        # try:
+        #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+        # except:
+        #     print("rep msg")
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
     def __state_change_ack_to_CC2(self, payload, message_id, state_request, CC_conn, CC_addr):  # to CC
@@ -538,6 +544,10 @@ class Server:
             if not self.is_leader:
                 self.__send_heartbeat_message_s()
                 print("states of executing clients: {}".format(self.ec_dict))
+            else:
+                # self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
+                self.new_data = True
+                self.new_data = False
 
 
 if "-p" in sys.argv:

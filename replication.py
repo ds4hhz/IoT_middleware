@@ -27,6 +27,7 @@ class Replication:
         self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # Bind to the server address
         self.multi_sock.bind(self.server_address)
+        self.multi_sock.settimeout(1)
         group = socket.inet_aton(self.multicast_group)
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
@@ -37,11 +38,16 @@ class Replication:
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.replication_clock,
                            payload=ec_dict_str)
         print(msg)
+
         self.multi_sock.sendto(msg.encode(), (self.multicast_group, self.server_address[1]))
         self.replication_clock += 1
         copy_of_members = self.members.copy()
         for member in range(len(self.members)):
-            data, address = self.multi_sock.recvfrom(self.max_response_size)
+            try:
+                data, address = self.multi_sock.recvfrom(self.max_response_size)
+            except socket.timeout as e:
+                print(e)
+                continue
             data_frame = in_filter(data.decode(), address)
             if data_frame[4] in copy_of_members:
                 copy_of_members.pop(copy_of_members.index(data_frame[4]))
