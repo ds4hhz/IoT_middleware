@@ -85,7 +85,7 @@ class ExecutingClient:
         self.udp_socket.settimeout(3)
         # Set the time-to-live for messages to 1 so they do not go past the
         # local network segment.
-        ttl = struct.pack('b', 1)
+        ttl = struct.pack('b', 2)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
     def __state_message(self, message_type: str):

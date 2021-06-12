@@ -36,7 +36,7 @@ class CommandingClient:
     def __create_multicast_socket(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(3)
-        ttl = struct.pack('b', 1)
+        ttl = struct.pack('b', 2)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
     def __get_server(self):  # query list of executing client
