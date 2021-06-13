@@ -27,28 +27,27 @@ class Replication:
         self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         # Bind to the server address
         self.multi_sock.bind(self.server_address)
+        self.multi_sock.settimeout(1)
         group = socket.inet_aton(self.multicast_group)
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
 
-    # def create_multicast_receiver(self):
-    #     # Create the socket
-    #     self.multi_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    #     # Bind to the server address
-    #     self.multi_sock.bind(self.server_address)
-    #     group = socket.inet_aton(self.multicast_group)
-    #     mreq = struct.pack('4sL', group, socket.INADDR_ANY)
-    #     self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-
     def send_replication_message(self, ec_dict_str: str):  # only in use from primary
+        print("send replication message!")
         msg = create_frame(priority=0, role="S", message_type="replication", msg_uuid=uuid.uuid4(),
                            ppid=self.my_uuid, fairness_assertion=1, sender_clock=self.replication_clock,
                            payload=ec_dict_str)
+        print(msg)
+
         self.multi_sock.sendto(msg.encode(), (self.multicast_group, self.server_address[1]))
         self.replication_clock += 1
         copy_of_members = self.members.copy()
         for member in range(len(self.members)):
-            data, address = self.multi_sock.recvfrom(self.max_response_size)
+            try:
+                data, address = self.multi_sock.recvfrom(self.max_response_size)
+            except socket.timeout as e:
+                print(e)
+                continue
             data_frame = in_filter(data.decode(), address)
             if data_frame[4] in copy_of_members:
                 copy_of_members.pop(copy_of_members.index(data_frame[4]))
@@ -71,7 +70,12 @@ class Replication:
         self.replication_clock += 1
 
     def get_replication_message(self):  # only used from secondary
-        data, address = self.multi_sock.recvfrom(self.max_response_size)
+        while True:
+            try:
+                data, address = self.multi_sock.recvfrom(self.max_response_size)
+            except socket.timeout:
+                continue
+            break
         data_frame = in_filter(data.decode(), address)
         if data_frame[2] == "replication" and data_frame[4] != self.my_uuid:
             self.__send_replication_message_ack()
@@ -81,4 +85,4 @@ class Replication:
                 self.ec_dict[k] = v
             print("ec dict in rep msg: ", self.ec_dict)
             return json.dumps(self.ec_dict)
-        return "{}"
+        return "fail"

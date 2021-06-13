@@ -13,7 +13,7 @@ import sched
 
 
 class ExecutingClient:
-    def __init__(self, address='127.0.0.1', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
+    def __init__(self, address='', port=11000, buffer_size=2048, multicast_group='224.3.29.71',
                  multicast_port=10000):
         self.client_address = address
         self.client_port = port
@@ -29,9 +29,10 @@ class ExecutingClient:
 
         # heartbeat on server
         # heartbeat
-        self.heartbeat_period = 3
+        self.heartbeat_period = 5
         self.scheduler = sched.scheduler(time.time, time.sleep)
         self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
+        self.lost_server = False
 
     def __bind_socket(self):
         print("open TCP socket: ", (self.client_address, self.client_port))
@@ -40,12 +41,51 @@ class ExecutingClient:
         conn, addr = self.socket.accept()
         return conn, addr
 
+    def __tcp_listener(self):
+        print("open TCP socket: ", (self.client_address, self.client_port))
+        self.socket.bind((self.client_address, self.client_port))
+        self.socket.listen(20)  # allows 20 server
+        while True:
+            CC_conn, CC_addr = self.socket.accept()
+            print("EC accept new server connection!")
+            thread = Thread(target=self.__handle_tcp_communication, args=(CC_conn, CC_addr))
+            thread.start()
+
+    def __handle_tcp_communication(self, conn, addr):
+        while True:
+            try:
+                data = conn.recvfrom(self.buffer_size)
+            except:
+                pass  # leading server has died! #ToDo: create new connection to leading server!
+            if (len(data[0]) == 0):
+                break  # close connection and wait for a new one
+            else:
+                data_frame = in_filter(data[0].decode(), addr)
+                # print("received data from TCP connection: ", data_frame)
+                if (data_frame[2] == "state_change_request"):
+                    print("get state change request")
+                    self.__state_change(
+                        state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
+                    # state wird so erwartet: [blinking]
+                    self.__send_ack(connection=conn, msg_uuid=data_frame[3])
+                elif (data_frame[2] == "heartbeat"):
+                    print("get heartbeat message")
+                    msg = self.__state_message("dynamic_discovery")
+                    try:
+                        conn.send(msg.encode())
+                    except:
+                        self.socket.listen(1)
+                        conn, addr = self.socket.accept()
+                        conn.send(msg.encode())
+                    self.my_lamport_clock += 1
+            self.__check_state()
+
     def __create_udp_socket(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(3)
         # Set the time-to-live for messages to 1 so they do not go past the
         # local network segment.
-        ttl = struct.pack('b', 1)
+        ttl = struct.pack('b', 2)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
     def __state_message(self, message_type: str):
@@ -63,12 +103,15 @@ class ExecutingClient:
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
-            self.udp_socket.close()
-            self.__create_udp_socket()
+            # self.udp_socket.close()
+            # self.__create_udp_socket()
             self.get_server()
             return
         print("received data from Server: ", data.decode())
         self.communication_partner = addr
+
+    def __multicast_receiver(self):
+        self.udp_socket
 
     def __state_change(self, state_request):
         if state_request in self.state_list:
@@ -94,14 +137,19 @@ class ExecutingClient:
         except socket.timeout:
             print("No leading server reachable!")
             print("try again!")
-            self.udp_socket.close()
+            self.lost_server = True
+            # self.udp_socket.close()
             time.sleep(1)
-            self.__create_udp_socket()
+            # self.__create_udp_socket()
             self.__send_heartbeat()
             return
+        if self.lost_server:
+            self.get_server()
+            self.lost_server = False
         if addr != self.communication_partner:
             print("leading server has changed!")
             self.communication_partner = addr
+            print("new communication partner: {}".format(self.communication_partner))
         self.scheduler.enter(self.heartbeat_period, 1, self.__send_heartbeat)
 
     def __check_state(self):
@@ -130,29 +178,37 @@ class ExecutingClient:
         heartbeat_thread = Thread(target=self.run_heartbeat_S, name="heartbeat_thread")
         self.__create_udp_socket()
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
-        connection, addr = self.__bind_socket()  # tcp socket to Server
+        # connection, addr = self.__bind_socket()  # tcp socket to Server
         heartbeat_thread.start()
-        while (True):
-            try:
-                data = connection.recvfrom(self.buffer_size)
-            except:
-                pass    # leading server has died! #ToDo: create new connection to leading server!
-            if (len(data[0]) == 0):
-                connection.close()
-                time.sleep(1)
-                self.socket.listen(1)
-                connection, addr = self.socket.accept()
-                continue
-            else:
-                data_frame = in_filter(data[0].decode(), addr)
-                # print("received data from TCP connection: ", data_frame)
-                if (data_frame[2] == "state_change_request"):
-                    self.__state_change(
-                        state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
-                    # state wird so erwartet: [blinking]
-                    self.__send_ack(connection=connection, msg_uuid=data_frame[3])
-                elif (data_frame[2] == "heartbeat"):
-                    msg = self.__state_message("dynamic_discovery")
-                    connection.send(msg.encode())
-                    self.my_lamport_clock += 1
-            self.__check_state()
+        self.__tcp_listener()
+        while True:
+            print("EC_client runs")
+            time.sleep(5)
+            # try:
+            #     data = connection.recvfrom(self.buffer_size)
+            # except:
+            #     pass    # leading server has died! #ToDo: create new connection to leading server!
+            # if (len(data[0]) == 0):
+            #     connection.close()
+            #     time.sleep(1)
+            #     self.socket.listen(1)
+            #     connection, addr = self.socket.accept()
+            #     continue
+            # else:
+            #     data_frame = in_filter(data[0].decode(), addr)
+            #     # print("received data from TCP connection: ", data_frame)
+            #     if (data_frame[2] == "state_change_request"):
+            #         self.__state_change(
+            #             state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
+            #         # state wird so erwartet: [blinking]
+            #         self.__send_ack(connection=connection, msg_uuid=data_frame[3])
+            #     elif (data_frame[2] == "heartbeat"):
+            #         msg = self.__state_message("dynamic_discovery")
+            #         try:
+            #             connection.send(msg.encode())
+            #         except:
+            #             self.socket.listen(1)
+            #             connection, addr = self.socket.accept()
+            #             connection.send(msg.encode())
+            #         self.my_lamport_clock += 1
+            # self.__check_state()
