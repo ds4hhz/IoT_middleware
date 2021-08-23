@@ -16,9 +16,6 @@ class CommandingClient:
                  multicast_port=10000):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # tcp client
         self.buffer_size = buffer_size
-        self.state_list = ["off", "on", "blinking"]
-        # self.states_dict = {"off": [1, 0, 0], "on": [0, 1, 0], "blinking": [0, 0, 1]}
-        self.state = self.state_list[0]
         self.uuid = uuid.uuid4()
         self.multicast_group = multicast_group
         self.multicast_port = multicast_port
@@ -46,7 +43,7 @@ class CommandingClient:
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
-            data, addr = self.udp_socket.recvfrom(2048)
+            data, addr = self.udp_socket.recvfrom(self.buffer_size)
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
@@ -67,7 +64,7 @@ class CommandingClient:
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
-            data, addr = self.udp_socket.recvfrom(2048)
+            data, addr = self.udp_socket.recvfrom(self.buffer_size)
         except socket.timeout:
             print("No leading server reachable!")
             print("try again!")
@@ -91,7 +88,7 @@ class CommandingClient:
         self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
         self.my_lamport_clock += 1
         try:
-            data, addr = self.udp_socket.recvfrom(2048)
+            data, addr = self.udp_socket.recvfrom(self.buffer_size)
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
@@ -112,51 +109,18 @@ class CommandingClient:
         print("open connection to: {} {}".format(self.communication_partner[0], self.tcp_port))
         self.tcp_socket.connect((self.communication_partner[0], self.tcp_port))
 
-    def __send_state_change_request_udp(self, ex_uuid, state):
-        state_change_msg_id = uuid.uuid4()
-        msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
-                           ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
-                           payload="{}, [{}]".format(ex_uuid, state))
-        self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-        # wait for ack
-        while True:
-            try:
-                data, add = self.udp_socket.recvfrom(2048)
-            except socket.timeout:
-                self.udp_socket.sendto(msg.encode(), (self.multicast_group, self.multicast_port))
-                continue
-            data_frame = in_filter(data.decode(), add)
-            if data_frame[2] == "error":
-                self.tcp_socket.close()
-                self.__create_tcp_socket()
-                self.__send_state_change_request(ex_uuid, state)
-                break
-            # if ack for state_change, than update ex_dict
-            print("ack from Server: ", data_frame)
-            if (data_frame[2] == "state_change_ack" and data_frame[3] == str(state_change_msg_id)):
-                self.ex_dict[ex_uuid] = state
-                print("update EC state: ", self.ex_dict)
-                # tcp_socket.close()
-                break
-            else:
-                print("wrong message, wait for state_change_ack")
-
     def __send_state_change_request(self, ex_uuid, state):
         state_change_msg_id = uuid.uuid4()
         msg = create_frame(priority=2, role="CC", message_type="state_change_request", msg_uuid=state_change_msg_id,
                            ppid=self.uuid, fairness_assertion=1, sender_clock=self.my_lamport_clock,
                            payload="{}, [{}]".format(ex_uuid, state))
-        # tcp_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # tcp_socket.settimeout(2)
-        # tcp_socket.connect((self.communication_partner[0], self.tcp_port))
-        # tcp_socket.connect(("127.0.0.1", 12000))
         self.tcp_socket.send(msg.encode())
         print("length of the message: ", len(msg.encode()))
         print("message id of change state request: ", state_change_msg_id)
         # wait for ack
         while True:
             try:
-                data, add = self.tcp_socket.recvfrom(2048)
+                data, add = self.tcp_socket.recvfrom(self.buffer_size)
             except socket.timeout as e:
                 print(e)
                 # reopen tcp connection

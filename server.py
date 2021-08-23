@@ -79,8 +79,6 @@ class Server:
                     return
                 elif self.discovery_counter <= 0:
                     break
-                # self.udp_socket.close()
-                # self.__create_multicast_socket_member_discovery()
                 self.__get_group_members()
                 return
             except:
@@ -91,13 +89,11 @@ class Server:
             if data_frame[2] == "group_discovery_ack" and not data_frame[7] in self.group_member_list:
                 payload_list = data_frame[7].split("/")
                 self.group_member_list.append(payload_list[0])
-                # sorted(self.group_member_list, reverse=True)  # absteigende Sortierung
                 self.group_member_list.sort(reverse=True)
                 temp_dict = json.loads(payload_list[1])
                 if len(temp_dict) != 0:
                     for k, v in temp_dict.items():
                         self.ec_dict[k] = v
-                # self.udp_socket.close()
 
     def __send_heartbeat_message_s(self):
         msg = create_frame(priority=2, role="S", message_type="heartbeat", msg_uuid=uuid.uuid4(),
@@ -120,7 +116,6 @@ class Server:
                 self.election_obj = Election(self.my_uuid, self.group_member_list)
                 print("heartbeat election")
                 self.election_obj.run_election()
-                # self.thread_list[-1].join()
                 return
             print("try again!")
             self.udp_socket.close()
@@ -131,20 +126,15 @@ class Server:
         if addr != self.leading_server_address:
             print("leading server has changed!")
             self.leading_server_address = addr
-        # self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__send_heartbeat_message_s)
 
     def __create_multicast_socket(self):
         # Create the socket
         self.multi_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        # Tell the operating system to add the socket to the multicast group
-        # on all interfaces.
         self.multi_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        # Bind to the server address
         self.multi_sock.bind(self.server_address)
         group = socket.inet_aton(self.multicast_group)
         mreq = struct.pack('4sL', group, socket.INADDR_ANY)
         self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
-        # self.multi_sock.setsockopt(socket.IPPROTO_IP, socket.SO_REUSEPORT, mreq)
 
     def __dynamic_discovery(self):  # messages over multicast group
         data, address = self.multi_sock.recvfrom(2048)
@@ -165,27 +155,8 @@ class Server:
                 self.ec_addresses[data_frame[4]] = address[0]
                 print("executing client addresses: {}".format(self.ec_addresses))
                 self.new_data = True
-                # try:
-                #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-                # except:
-                #     print("rep msg")
             elif data_frame[1] == "S" and data_frame[2] == "group_discovery":  # group member request
                 self.__group_discovery_ack(address)
-            elif self.is_leader and data_frame[1] == "CC" and data_frame[
-                2] == "state_change_request":  # TODO: <<<------------>>>>>>>
-                print("state change request from CC")
-                target_ec_uuid = data_frame[7][:data_frame[7].index(",")]
-                state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
-                payload = "{}, [{}]".format(target_ec_uuid, state_request)
-                # EC_address = (self.ec_dict[target_ec_uuid][1], self.ec_dict[target_ec_uuid][2])
-                EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
-                print("address of executing client {}".format(EC_address))
-                got_state_change_request = self.__send_state_change_request_to_EC(data_frame[3], payload, target_ec_uuid,
-                                                                                  state_request, EC_address)
-                ack_msg = create_frame(1, "S", "state_change_ack", data_frame[3], self.my_uuid, 1, self.my_clock,
-                                       "update your ex_dict, state ={}".format(state_request))
-                self.udp_socket.sendto(ack_msg.encode(), address)
-                # ToDO: send ack to CC
             elif data_frame[2] == "tcp_port_request" and self.is_leader:  # send tcp socket port
                 self.__send_tcp_port(address)
             # election messages
@@ -203,7 +174,6 @@ class Server:
                     print("leader message received")
                     self.is_leader = False
                     self.running_election = False
-                # self.run_heartbeat_s()
             elif data_frame[2] == "leader_msg" and data_frame[4] == str(self.my_uuid):
                 self.__send_leader_message_ack(address)
                 print("leader message received -> I'm the leader!")
@@ -303,24 +273,7 @@ class Server:
     def __create_tcp_socket_EC(self):
         self.ex_tcp_con = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    def __send_state_change_request_to_EC_udp(self, message_id, payload, cc_uuid, state_request):
-        self.udp_socket.sendto(
-            create_frame(1, "S", "state_change_request", message_id, self.my_uuid, 1, self.my_clock,
-                         payload).encode(), (self.multicast_group, self.multicast_port))
-        while True:
-            try:
-                data, addr = self.udp_socket.recv(2048)
-            except:
-                # try again
-                self.__send_state_change_request_to_EC_udp(message_id, payload, cc_uuid, state_request)
-                return
-            data_frame = in_filter(data, addr)
-            if data_frame[2] == "state_change_ack" and data_frame[3] == message_id:
-                return True
-
     def __send_state_change_request_to_EC(self, message_id, payload, cc_uuid, state_request, EC_connection: tuple):
-
-        # ex_tcp_con.connect(('127.0.0.1', 11000))
         try:
             self.ex_tcp_con.connect(EC_connection)
         except:
@@ -348,10 +301,6 @@ class Server:
             self.ec_dict[cc_uuid][0] = state_request
             self.ex_tcp_con.close()
             self.new_data = True
-            # try:
-            #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-            # except:
-            #     print("rep msg")
             return True
         else:
             self.ex_tcp_con.close()
@@ -387,10 +336,6 @@ class Server:
         print("EC_dict updated")
         print("EC_dict: ", self.ec_dict)
         self.new_data = True
-        # try:
-        #     self.replication_obj.send_replication_message(json.dumps(self.ec_dict))
-        # except:
-        #     print("rep msg")
         self.scheduler_ec.enter(self.heartbeat_period_ec, 1, self.__check_EC_state)
 
     def __state_change_ack_to_CC2(self, payload, message_id, state_request, CC_conn, CC_addr):  # to CC
@@ -410,7 +355,7 @@ class Server:
 
     def run_dynamic_discovery(self):
         self.__create_multicast_socket()
-        while (True):
+        while True:
             data_frame, address = self.__dynamic_discovery()
             # self.__dynamic_discovery_ack(data_frame, address)
 
@@ -425,7 +370,7 @@ class Server:
         message_id = None
         state_request = None
         target_ec_uuid = None
-        if (len(data[0]) == 0):
+        if len(data[0]) == 0:
             print("connection lost!")
             msg = create_frame(1, "S", "error", uuid.uuid4(), self.my_uuid, 1, self.my_clock, "error!")
             try:
@@ -433,11 +378,6 @@ class Server:
             except:
                 CC_conn, CC_addr = self.tcp_socket.accept()
                 CC_conn.send(msg.encode())
-            # ToDo: send message to CC to close connection and start new
-            # CC_conn.close()
-            # # listen for new connection
-            # self.tcp_socket.listen(1)  # allows 1 CCs
-            # CC_conn, CC_addr = self.tcp_socket.accept()
             data_received = False
         else:
             data_received = True
@@ -446,15 +386,13 @@ class Server:
             state_request = data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")]
             payload = "{}, [{}]".format(target_ec_uuid, state_request)
             message_id = data_frame[3]
-            print("payload: ", payload)
             # update ex_dict after state
         return data_received, payload, message_id, state_request, target_ec_uuid
 
     def __handle_CC_communication(self, CC_conn, CC_addr):
         self.__create_tcp_socket_EC()
         while True:
-            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,
-                                                                                                                CC_addr)
+            data_received, payload, message_id, state_request, target_ec_uuid = self.__receive_request_from__CC(CC_conn,                                                                                                               CC_addr)
             if data_received:
                 try:
                     EC_address = (self.ec_addresses[target_ec_uuid], self.ec_dict[target_ec_uuid][2])
@@ -463,23 +401,20 @@ class Server:
                     self.__negative_state_change_ack(payload, message_id, state_request, CC_conn, CC_addr)
                     continue
 
-                got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,
-                                                                                  state_request, EC_address)
+                got_state_change_request = self.__send_state_change_request_to_EC(message_id, payload, target_ec_uuid,                                                                                  state_request, EC_address)
                 print("state change request sendet to EC")
                 if got_state_change_request:
                     if data_received:
                         self.__state_change_ack_to_CC2(payload, message_id, state_request, CC_conn, CC_addr)
                         print("send ack to CC")
-                        # self.run_tcp_socket() #ToDo: negative ack
                         continue
                 else:
                     continue
             else:
                 continue
-                # self.__open_tcp_socket()
 
     def __tcp_listener(self):
-        self.tcp_socket.listen(20)  # allows 1 CCs
+        self.tcp_socket.listen(20)  # allows 20 CCs
         while True:
             CC_conn, CC_addr = self.tcp_socket.accept()
             print("Server accept new CC connection!")
@@ -495,8 +430,6 @@ class Server:
 
     def run_heartbeat_s(self):
         self.scheduler_s.run()
-        # while True:
-        #     pass
 
     def run_member_discovery(self):
         self.__create_multicast_socket_member_discovery()

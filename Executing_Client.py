@@ -61,12 +61,11 @@ class ExecutingClient:
                 break  # close connection and wait for a new one
             else:
                 data_frame = in_filter(data[0].decode(), addr)
-                # print("received data from TCP connection: ", data_frame)
                 if (data_frame[2] == "state_change_request"):
                     print("get state change request")
                     self.__state_change(
                         state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
-                    # state wird so erwartet: [blinking]
+                    # state wird so erwartet: [blinking],(address)
                     self.__send_ack(connection=conn, msg_uuid=data_frame[3])
                 elif (data_frame[2] == "heartbeat"):
                     print("get heartbeat message")
@@ -83,8 +82,6 @@ class ExecutingClient:
     def __create_udp_socket(self):
         self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.udp_socket.settimeout(3)
-        # Set the time-to-live for messages to 1 so they do not go past the
-        # local network segment.
         ttl = struct.pack('b', 2)
         self.udp_socket.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, ttl)
 
@@ -103,8 +100,6 @@ class ExecutingClient:
         except socket.timeout:
             print("time out! No response!")
             print("try again!")
-            # self.udp_socket.close()
-            # self.__create_udp_socket()
             self.get_server()
             return
         print("received data from Server: ", data.decode())
@@ -138,9 +133,7 @@ class ExecutingClient:
             print("No leading server reachable!")
             print("try again!")
             self.lost_server = True
-            # self.udp_socket.close()
             time.sleep(1)
-            # self.__create_udp_socket()
             self.__send_heartbeat()
             return
         if self.lost_server:
@@ -178,37 +171,10 @@ class ExecutingClient:
         heartbeat_thread = Thread(target=self.run_heartbeat_S, name="heartbeat_thread")
         self.__create_udp_socket()
         self.get_server()  # dynamic discovery -> bekannt machen bei den Servern
-        # connection, addr = self.__bind_socket()  # tcp socket to Server
         heartbeat_thread.start()
         self.__tcp_listener()
         while True:
+            # main thread not in use
             print("EC_client runs")
             time.sleep(5)
-            # try:
-            #     data = connection.recvfrom(self.buffer_size)
-            # except:
-            #     pass    # leading server has died! #ToDo: create new connection to leading server!
-            # if (len(data[0]) == 0):
-            #     connection.close()
-            #     time.sleep(1)
-            #     self.socket.listen(1)
-            #     connection, addr = self.socket.accept()
-            #     continue
-            # else:
-            #     data_frame = in_filter(data[0].decode(), addr)
-            #     # print("received data from TCP connection: ", data_frame)
-            #     if (data_frame[2] == "state_change_request"):
-            #         self.__state_change(
-            #             state_request=data_frame[7][data_frame[7].index("[") + 1:data_frame[7].index("]")])
-            #         # state wird so erwartet: [blinking]
-            #         self.__send_ack(connection=connection, msg_uuid=data_frame[3])
-            #     elif (data_frame[2] == "heartbeat"):
-            #         msg = self.__state_message("dynamic_discovery")
-            #         try:
-            #             connection.send(msg.encode())
-            #         except:
-            #             self.socket.listen(1)
-            #             connection, addr = self.socket.accept()
-            #             connection.send(msg.encode())
-            #         self.my_lamport_clock += 1
-            # self.__check_state()
+
